@@ -1,0 +1,10 @@
+{
+  "name": "Pulso",
+  "short_name": "Pulso",
+  "description": "Tu plan de entrenamiento y bienestar.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F7F2",
+  "theme_color": "#146C5B",
+  "lang": "es"
+}

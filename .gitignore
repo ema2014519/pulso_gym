@@ -1,0 +1,6 @@
+node_modules/
+.next/
+.env.local
+.agents/
+.codebase-memory/
+tsconfig.tsbuildinfo
