@@ -1609,7 +1609,7 @@ body { overflow-x: hidden; }
   .profile-form{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
   .profile-form>label,.profile-form fieldset{gap:5px;font-size:.63rem;letter-spacing:.04em}
   .profile-form>label:nth-child(2){grid-column:1/-1;grid-row:2}
-  .profile-form select{min-height:40px;padding:0 8px;border-radius:8px;font-size:.7rem}
+.profile-form select,.profile-form input[type="text"]{min-height:40px;padding:0 8px;border-radius:8px;font-size:.7rem}
   .profile-form fieldset{margin-top:2px;padding:9px;border-radius:10px}
   .profile-form legend{padding:0 4px;font-size:.62rem}
   .profile-equipment{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
@@ -1757,4 +1757,110 @@ canvas { max-width: 100%; }
   .workout-exercise-copy { padding: 16px; }
   .workout-exercise h1 { font-size: clamp(2rem, 6vw, 3rem); }
   .workout-exercise ul { grid-template-columns: 1fr; }
+}
+
+/* Inicio móvil: jerarquía compacta y acción Registrar siempre reconocible. */
+.profile-form .profile-name-field { grid-column: 1 / -1; }
+.profile-form input[type="text"] {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid #48515a;
+  border-radius: 8px;
+  outline: 0;
+  background: #101315;
+  color: #f8fafc;
+  font: inherit;
+  text-transform: none;
+}
+.profile-form input[type="text"]:focus-visible { border-color: #f97316; box-shadow: 0 0 0 3px rgb(249 115 22 / 18%); }
+
+.sidebar .nav-item.nav-action,
+.bottom-nav .bottom-nav-item.nav-action {
+  border: 1px solid rgb(249 115 22 / 72%);
+  background: linear-gradient(145deg, #fb923c, #f97316);
+  color: #16191b;
+  box-shadow: inset 0 1px rgb(255 255 255 / 28%);
+}
+
+.sidebar .nav-item.nav-action:hover,
+.bottom-nav .bottom-nav-item.nav-action:hover,
+.sidebar .nav-item.nav-action.is-active,
+.bottom-nav .bottom-nav-item.nav-action.is-active {
+  background: linear-gradient(145deg, #a3e635, #84cc16);
+  color: #151a10;
+  box-shadow: inset 0 1px rgb(255 255 255 / 30%);
+}
+
+.sidebar .nav-item.nav-action svg,
+.bottom-nav .bottom-nav-item.nav-action svg { stroke-width: 3; }
+
+@media (max-width: 900px) {
+  .bottom-nav .bottom-nav-item,
+  .bottom-nav .bottom-nav-item.nav-action { min-height: 48px; }
+
+  .bottom-nav .bottom-nav-item.nav-action { border-radius: 10px; }
+}
+
+@media (max-width: 640px) {
+  .content {
+    width: 100%;
+    padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) calc(74px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+
+  .topbar {
+    min-height: 68px;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 12px 13px;
+    border-radius: 16px;
+  }
+
+  .topbar .eyebrow { margin-bottom: 3px; font-size: .62rem; }
+  .topbar h1 { font-size: clamp(1.55rem, 8vw, 2rem); line-height: 1; overflow-wrap: anywhere; }
+  .topbar .icon-button { width: 44px; height: 44px; flex: none; border-radius: 12px; }
+
+  .hero-card { border-radius: 18px; }
+  .hero-copy { padding: 21px 16px 18px; }
+  .session-label { font-size: .7rem; }
+  .hero-card h2 { margin: 12px 0 8px; font-size: clamp(2.35rem, 12.5vw, 3.2rem); line-height: .82; }
+  .hero-card p { margin-bottom: 14px; font-size: .84rem; line-height: 1.45; }
+  .session-meta { gap: 10px; margin-bottom: 16px; font-size: .74rem; }
+  .hero-actions { gap: 8px; }
+  .hero-actions .button { min-height: 48px; }
+
+  .dashboard-grid,
+  .lower-grid { gap: 10px; margin-top: 10px; }
+
+  .card { padding: 15px; border-radius: 16px; }
+  .card-heading { gap: 8px; }
+  .card-heading h2,
+  .next-card h2,
+  .insight-card h2 { font-size: 1.45rem; }
+  .card-heading .text-button { min-height: 40px; align-self: stretch; justify-content: space-between; padding-inline: 2px; }
+
+  .week-row { gap: 2px; margin: 15px 0 12px; }
+  .day { gap: 6px; font-size: .58rem; }
+  .day-number { width: clamp(30px, 9vw, 36px); height: clamp(30px, 9vw, 36px); }
+  .supporting-text { font-size: .78rem; }
+
+  .next-card .exercise-progress { margin: 16px 0 10px; }
+  .next-card .text-button { min-height: 44px; }
+  .checkin-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 14px; }
+  .choice { min-width: 0; min-height: 44px; padding-inline: 8px; }
+  .insight-card { align-items: flex-start; gap: 12px; }
+
+  .bottom-nav { justify-content: space-between; gap: 2px; }
+  .bottom-nav .bottom-nav-item,
+  .bottom-nav .bottom-nav-item.nav-action { width: min(19vw, 76px); font-size: .55rem; }
+  .bottom-nav-item > a { gap: 1px; }
+}
+
+@media (max-width: 360px) {
+  .topbar h1 { font-size: 1.45rem; }
+  .hero-card h2 { font-size: 2.3rem; }
+  .hero-copy { padding-inline: 14px; }
+  .card { padding-inline: 12px; }
+  .day-number { width: 29px; height: 29px; }
+  .bottom-nav .bottom-nav-item span { font-size: .5rem; }
 }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Dumbbell, LockKeyhole, Mail } from "lucide-react";
+import { ArrowRight, Dumbbell, LockKeyhole, Mail, UserRound } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup" | "recovery" | "reset";
@@ -26,6 +26,7 @@ async function createServerSession(credentials: { email: string; password: strin
 export default function LoginPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [mode, setMode] = useState<AuthMode>("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -53,6 +54,11 @@ export default function LoginPage() {
     setMessage("");
 
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedName = name.trim().replace(/\s+/g, " ");
+    if (mode === "signup" && normalizedName.length < 2) {
+      setError("Ingresa tu nombre para personalizar tu espacio.");
+      return;
+    }
     if (mode !== "reset" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       setError("Ingresa un correo electrónico válido.");
       return;
@@ -80,7 +86,10 @@ export default function LoginPage() {
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: normalizedEmail,
           password,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/evaluacion` },
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=/evaluacion`,
+            data: { display_name: normalizedName, full_name: normalizedName },
+          },
         });
         if (signUpError) throw signUpError;
         if (data.session) {
@@ -174,6 +183,13 @@ export default function LoginPage() {
           </div>
 
           <form className="login-form" onSubmit={handleSubmit} noValidate aria-busy={isSubmitting}>
+            {mode === "signup" && <>
+              <label htmlFor="name">Tu nombre</label>
+              <div className="login-input">
+                <UserRound size={18} aria-hidden="true" />
+                <input id="name" name="name" type="text" placeholder="Cómo quieres que te llamemos" autoComplete="name" minLength={2} value={name} onChange={(event) => setName(event.target.value)} required disabled={isSubmitting} />
+              </div>
+            </>}
             {mode !== "reset" && <>
               <label htmlFor="email">Correo electrónico</label>
               <div className="login-input">

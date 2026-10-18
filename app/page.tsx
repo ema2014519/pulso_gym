@@ -39,7 +39,7 @@ import { WorkoutReminders } from "./workout-reminders";
 
 type TrainingPlace = "gimnasio" | "casa";
 type ProgressLog = { id: string; repetitions: number | null; doseCompleted: string | null; loadKg: number | null; effort: number | null; pain: number | null; createdAt: string; exerciseName: string };
-type ProfileForm = { goal: string; experienceLevel: string; daysPerWeek: string; homeEquipment: string[] };
+type ProfileForm = { displayName: string; goal: string; experienceLevel: string; daysPerWeek: string; homeEquipment: string[] };
 
 const navItems = [
   { label: "Inicio", icon: Home },
@@ -63,6 +63,23 @@ const calendarWeekdays = [
 
 function normalizeDay(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function accountNameFromUser(user: { email?: string; user_metadata?: Record<string, unknown> }) {
+  const metadata = user.user_metadata ?? {};
+  const storedName = [metadata.display_name, metadata.full_name, metadata.name, metadata.user_name, metadata.preferred_username]
+    .find((value): value is string => typeof value === "string" && value.trim().length > 0);
+  if (storedName) return storedName.trim().replace(/\s+/g, " ");
+  return (user.email?.split("@")[0] ?? "")
+    .replace(/[._-]+/g, " ")
+    .replace(/\d+$/g, "")
+    .trim()
+    .replace(/(^|\s)\p{L}/gu, (letter) => letter.toLocaleUpperCase("es"));
+}
+
+function greetingNameFromUser(user: { email?: string; user_metadata?: Record<string, unknown> }) {
+  const firstName = accountNameFromUser(user).split(/\s+/)[0] || "";
+  return firstName ? firstName.charAt(0).toLocaleUpperCase("es") + firstName.slice(1).toLocaleLowerCase("es") : "";
 }
 
 const weekdays = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
@@ -169,12 +186,13 @@ export function AppWorkspace({ view }: { view: AppView }) {
   const [isProgressLoading, setIsProgressLoading] = useState(true);
   const [progressLoadError, setProgressLoadError] = useState("");
   const [progressReloadKey, setProgressReloadKey] = useState(0);
-  const [profile, setProfile] = useState<ProfileForm>({ goal: "Ganar fuerza", experienceLevel: "Estoy empezando", daysPerWeek: "3", homeEquipment: ["Peso corporal"] });
+  const [profile, setProfile] = useState<ProfileForm>({ displayName: "", goal: "Ganar fuerza", experienceLevel: "Estoy empezando", daysPerWeek: "3", homeEquipment: ["Peso corporal"] });
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isRegeneratingPlan, setIsRegeneratingPlan] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [userName, setUserName] = useState("");
   const [weekDates, setWeekDates] = useState<string[]>(() => calendarWeekdays.map(() => "\u2014"));
   const [todayPosition, setTodayPosition] = useState<number | null>(null);
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
@@ -260,13 +278,15 @@ export function AppWorkspace({ view }: { view: AppView }) {
     async function loadProfile() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || cancelled) return;
+      const displayName = accountNameFromUser(user);
+      setUserName(greetingNameFromUser(user));
       const { data } = await supabase
         .from("profiles")
         .select("goal, experience_level, days_per_week, home_equipment")
         .eq("id", user.id)
         .maybeSingle();
       if (cancelled) return;
-      if (data) setProfile({ goal: data.goal, experienceLevel: data.experience_level, daysPerWeek: String(data.days_per_week), homeEquipment: data.home_equipment ?? [] });
+      setProfile((current) => data ? { displayName, goal: data.goal, experienceLevel: data.experience_level, daysPerWeek: String(data.days_per_week), homeEquipment: data.home_equipment ?? [] } : { ...current, displayName });
       setIsProfileLoading(false);
     }
 
@@ -401,10 +421,24 @@ export function AppWorkspace({ view }: { view: AppView }) {
   async function saveProfile() {
     setIsSavingProfile(true);
     setProfileMessage("");
+    const displayName = profile.displayName.trim().replace(/\s+/g, " ");
+    if (displayName.length < 2) {
+      setIsSavingProfile(false);
+      setProfileMessage("Ingresa un nombre de al menos 2 caracteres.");
+      return;
+    }
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       setIsSavingProfile(false);
       setProfileMessage("Tu sesión expiró. Inicia sesión nuevamente.");
+      return;
+    }
+    const { error: nameError } = await supabase.auth.updateUser({
+      data: { ...user.user_metadata, display_name: displayName, full_name: displayName },
+    });
+    if (nameError) {
+      setIsSavingProfile(false);
+      setProfileMessage(`No pudimos guardar tu nombre: ${nameError.message}`);
       return;
     }
     const { error } = await supabase.from("profiles").update({
@@ -415,6 +449,7 @@ export function AppWorkspace({ view }: { view: AppView }) {
       updated_at: new Date().toISOString(),
     }).eq("id", user.id);
     setIsSavingProfile(false);
+    if (!error) setUserName(greetingNameFromUser({ email: user.email, user_metadata: { display_name: displayName } }));
     setProfileMessage(error ? error.message : "Perfil actualizado.");
   }
 
@@ -576,8 +611,8 @@ export function AppWorkspace({ view }: { view: AppView }) {
       <section className="content" id="inicio">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Lunes · Semana 01</p>
-            <h1>Vamos, Ana.</h1>
+            <p className="eyebrow">{todayPosition === null ? "Tu espacio de hoy" : `${calendarWeekdays[todayPosition].full} · Esta semana`}</p>
+            <h1>{userName ? `Vamos, ${userName}.` : "Vamos por tu objetivo."}</h1>
           </div>
           <button className="icon-button" type="button" aria-label="Configurar recordatorios" onClick={() => router.push("/plan#recordatorios")}>
             <Bell size={20} aria-hidden="true" />
@@ -678,6 +713,7 @@ export function AppWorkspace({ view }: { view: AppView }) {
               <div className="plan-view-heading"><div><p className="eyebrow">Perfil personal</p><h2 id="profile-title">AJUSTA TU PLAN A TU VIDA.</h2><p>{generatedPlan?.assessment?.recovery ? "Los cambios de recuperación deben revisarse mediante el chat para actualizar síntomas, fase y dosis." : "Estos datos determinan el volumen y las alternativas que verás en tus sesiones."}</p></div><button className="button button-quiet" type="button" onClick={() => router.push("/")}>Volver al inicio</button></div>
               {generatedPlan?.assessment?.recovery && <div className="plan-rationale"><span aria-hidden="true"><HeartPulse size={18} /></span><div><strong>Perfil de recuperación activo</strong><p>Fase {generatedPlan.assessment.recovery.phase.replaceAll("_", " ")} · {generatedPlan.assessment.recovery.affectedAreas.join(", ")}. Pulso IA debe volver a conversar contigo antes de cambiar esta prescripción.</p></div></div>}
               {isProfileLoading ? <p className="progress-state">Cargando tu perfil…</p> : <div className="profile-form">
+                <label className="profile-name-field">Nombre<input type="text" autoComplete="name" minLength={2} value={profile.displayName} onChange={(event) => setProfile((current) => ({ ...current, displayName: event.target.value }))} /></label>
                 <label>Objetivo<select value={profile.goal} onChange={(event) => setProfile((current) => ({ ...current, goal: event.target.value }))}>{["Ganar fuerza", "Ganar músculo", "Perder grasa", "Crear hábito", "Recuperar movimiento"].map((option) => <option key={option}>{option}</option>)}</select></label>
                 <label>Nivel<select value={profile.experienceLevel} onChange={(event) => setProfile((current) => ({ ...current, experienceLevel: event.target.value }))}>{["Estoy empezando", "Ya entreno a veces", "Entreno con constancia"].map((option) => <option key={option}>{option}</option>)}</select></label>
                 <label>Días por semana<select value={profile.daysPerWeek} onChange={(event) => setProfile((current) => ({ ...current, daysPerWeek: event.target.value }))}>{[2, 3, 4, 5].map((option) => <option key={option} value={option}>{option} días</option>)}</select></label>
