@@ -23,7 +23,7 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
-  if (!user && (pathname === "/" || pathname.startsWith("/evaluacion"))) {
+  if (!user && pathname !== "/login") {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";
@@ -41,5 +41,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js).*)"],
+  matcher: ["/", "/evaluacion/:path*", "/evaluacion-asistida/:path*", "/entrenamiento/:path*", "/plan/:path*", "/registrar", "/registrar/:path*", "/progreso/:path*", "/perfil/:path*", "/login"],
 };

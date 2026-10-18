@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+.agents
+.codebase-memory
+.qodo
+.vercel
+logs
+*.log
+supabase/.temp
+tsconfig.tsbuildinfo

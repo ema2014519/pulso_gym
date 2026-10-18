@@ -2,16 +2,28 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { ArrowRight, Dumbbell, LockKeyhole, Mail } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup" | "recovery" | "reset";
 
+async function createServerSession(credentials: { email: string; password: string }) {
+  const response = await fetch("/auth/session", {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(credentials),
+  });
+
+  if (!response.ok) {
+    const result = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(result?.error || "No pudimos guardar la sesión en este navegador.");
+  }
+}
+
 export default function LoginPage() {
-  const router = useRouter();
-  const reduceMotion = useReducedMotion();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
@@ -19,9 +31,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const sceneTransition = reduceMotion
-    ? { duration: 0.01 }
-    : { duration: 0.9, ease: [0.16, 1, 0.3, 1] as const };
+  const sceneTransition = { duration: 0.9, ease: [0.16, 1, 0.3, 1] as const };
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("reset") === "1") {
@@ -41,27 +51,41 @@ export default function LoginPage() {
     event.preventDefault();
     setError("");
     setMessage("");
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (mode !== "reset" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setError("Ingresa un correo electrónico válido.");
+      return;
+    }
+    if (mode !== "recovery" && !password) {
+      setError("Ingresa tu contraseña.");
+      return;
+    }
+    if ((mode === "signup" || mode === "reset") && password.length < 8) {
+      setError("La nueva contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       if (mode === "login") {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInError) throw signInError;
-        router.replace("/");
-        router.refresh();
+        await createServerSession({ email: normalizedEmail, password });
+        setMessage("Sesión iniciada. Abriendo tu plan…");
+        window.location.replace(new URL("/", window.location.origin).href);
         return;
       }
 
       if (mode === "signup") {
         const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
+          email: normalizedEmail,
           password,
           options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/evaluacion` },
         });
         if (signUpError) throw signUpError;
         if (data.session) {
-          router.replace("/evaluacion");
-          router.refresh();
+          await createServerSession({ email: normalizedEmail, password });
+          window.location.replace(new URL("/evaluacion", window.location.origin).href);
           return;
         }
         setMessage("Revisa tu correo y confirma tu cuenta para continuar con tu evaluación.");
@@ -69,7 +93,7 @@ export default function LoginPage() {
       }
 
       if (mode === "recovery") {
-        const { error: recoveryError } = await supabase.auth.resetPasswordForEmail(email, {
+        const { error: recoveryError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
           redirectTo: `${window.location.origin}/auth/callback?next=/login?reset=1`,
         });
         if (recoveryError) throw recoveryError;
@@ -83,7 +107,11 @@ export default function LoginPage() {
       setPassword("");
       setMode("login");
     } catch (authError) {
-      setError(authError instanceof Error ? authError.message : "No se pudo completar la operación. Inténtalo de nuevo.");
+      const detail = authError instanceof Error ? authError.message : "";
+      if (/invalid login credentials/i.test(detail)) setError("Correo o contraseña incorrectos.");
+      else if (/email not confirmed/i.test(detail)) setError("Confirma tu correo antes de iniciar sesión.");
+      else if (/failed to fetch|network/i.test(detail)) setError("No pudimos conectar con el servicio de acceso. Revisa tu conexión e inténtalo nuevamente.");
+      else setError(detail || "No se pudo completar la operación. Inténtalo de nuevo.");
     } finally {
       setIsSubmitting(false);
     }
@@ -112,7 +140,7 @@ export default function LoginPage() {
         <motion.div
           className="gym-3d-stage"
           aria-hidden="true"
-          initial={reduceMotion ? false : { opacity: 0, y: 42, rotateX: 18, scale: 0.92 }}
+          initial={{ opacity: 0, y: 42, rotateX: 18, scale: 0.92 }}
           animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
           transition={sceneTransition}
         >
@@ -131,9 +159,9 @@ export default function LoginPage() {
         </Link>
         <motion.div
           className="login-card"
-          initial={reduceMotion ? false : { opacity: 0, x: 28 }}
+          initial={{ opacity: 0, x: 28 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ ...sceneTransition, delay: reduceMotion ? 0 : 0.16 }}
+          transition={{ ...sceneTransition, delay: 0.16 }}
         >
           <Link className="brand login-panel-brand" href="/" aria-label="Pulso, ir al inicio">
             <span className="brand-mark" aria-hidden="true"><Dumbbell size={18} strokeWidth={2.6} /></span>
@@ -145,19 +173,19 @@ export default function LoginPage() {
             <p>{content.description}</p>
           </div>
 
-          <form className="login-form" onSubmit={handleSubmit}>
+          <form className="login-form" onSubmit={handleSubmit} noValidate aria-busy={isSubmitting}>
             {mode !== "reset" && <>
               <label htmlFor="email">Correo electrónico</label>
               <div className="login-input">
                 <Mail size={18} aria-hidden="true" />
-                <input id="email" name="email" type="email" placeholder="tu@email.com" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+                <input id="email" name="email" type="email" placeholder="tu@email.com" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required disabled={isSubmitting} />
               </div>
             </>}
             {mode !== "recovery" && <>
             <label htmlFor="password">Contraseña</label>
             <div className="login-input">
               <LockKeyhole size={18} aria-hidden="true" />
-              <input id="password" name="password" type="password" placeholder="••••••••" autoComplete={mode === "reset" ? "new-password" : mode === "signup" ? "new-password" : "current-password"} minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required />
+              <input id="password" name="password" type="password" placeholder="••••••••" autoComplete={mode === "reset" ? "new-password" : mode === "signup" ? "new-password" : "current-password"} minLength={mode === "signup" || mode === "reset" ? 8 : undefined} value={password} onChange={(event) => setPassword(event.target.value)} required disabled={isSubmitting} />
             </div>
             </>}
             {mode === "login" &&

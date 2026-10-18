@@ -5,5 +5,5 @@ import nextTs from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores([".agents/**", ".next/**", "node_modules/**"]),
+  globalIgnores([".agents/**", ".next/**", "node_modules/**", "public/mediapipe/wasm/**"]),
 ]);

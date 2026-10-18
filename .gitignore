@@ -4,3 +4,9 @@ node_modules/
 .agents/
 .codebase-memory/
 tsconfig.tsbuildinfo
+*.log
+logs/
+supabase/.temp/
+
+.vercel
+.env*

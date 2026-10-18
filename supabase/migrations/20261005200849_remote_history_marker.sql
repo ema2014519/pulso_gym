@@ -1,0 +1,3 @@
+-- Esta versión ya fue aplicada en el proyecto remoto antes de incorporar
+-- el historial de migraciones al repositorio. Se conserva como marcador
+-- para que Supabase pueda reconciliar el historial sin repetir sus cambios.
