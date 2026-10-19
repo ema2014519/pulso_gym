@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, Clock3, Dumbbell, Pause, Play, Plus, RotateCcw, SkipForward, Trophy } from "lucide-react";
 import { AmbientGymBackground } from "../ambient-gym-background";
-import { getExerciseReference } from "@/lib/exercise-media";
+import type { ExerciseReference } from "@/lib/exercise-media";
+import { useExerciseReference } from "@/lib/use-exercise-reference";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { recoveryExercisesForCurrentPhase, sessionForContext, type BiologicalSex, type PlannedSession, type RecoveryExercisePrescription, type WeeklyPlan } from "@/lib/training";
 
@@ -17,8 +18,10 @@ function formatTime(seconds: number) {
   return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
 }
 
-function frameImage(image: string, stage: "inicio" | "final") {
-  return image.replace("/exercises/", "/exercises/frames/").replace(/\.webp$/, `-${stage}.webp`);
+function frameImage(reference: ExerciseReference, stage: "inicio" | "final") {
+  if (stage === "inicio" && reference.startImage) return reference.startImage;
+  if (stage === "final" && reference.endImage) return reference.endImage;
+  return reference.image.replace("/exercises/", "/exercises/frames/").replace(/\.webp$/, `-${stage}.webp`);
 }
 
 function numericDose(value: string) {
@@ -68,8 +71,8 @@ export default function GuidedWorkoutPage() {
   const [ready, setReady] = useState(false);
 
   const exercise = session?.exercises[exerciseIndex];
-  const reference = exercise ? getExerciseReference(exercise.name, biologicalSex) : undefined;
   const recoveryPrescription = exercise ? recoveryExercises.find((item) => item.name.trim().toLocaleLowerCase() === exercise.name.trim().toLocaleLowerCase()) : undefined;
+  const { reference, isGenerating: isGeneratingReference } = useExerciseReference(exercise?.name ?? "", biologicalSex, recoveryPrescription?.instructions ?? "");
   const totalSets = session?.exercises.reduce((sum, item) => sum + item.sets, 0) ?? 0;
   const progress = totalSets ? Math.round((completedSets / totalSets) * 100) : 0;
   const storageKey = session ? `pulso-workout-${session.id}` : "";
@@ -206,7 +209,7 @@ export default function GuidedWorkoutPage() {
     <header className="workout-header"><Link href="/plan" className="workout-back"><ArrowLeft size={19} /> Guardar y salir</Link><div><span>{planName}</span><strong>{session.day} · {session.focus}</strong></div><button type="button" className="workout-pause" onClick={() => setPaused((current) => !current)} aria-pressed={paused}>{paused ? <Play size={18} /> : <Pause size={18} />} {paused ? "Continuar" : "Pausar"}</button></header>
     <div className="workout-progress" aria-label={`${progress}% de la rutina completada`}><span style={{ width: `${progress}%` }} /></div>
     {phase === "complete" ? <section className="workout-finish" aria-labelledby="finish-title"><span className="finish-icon"><Trophy size={34} /></span><p className="eyebrow">Rutina completada</p><h1 id="finish-title">TRABAJO HECHO.</h1><p>Terminaste {completedSets} series en {formatTime(elapsedSeconds)}. Tu avance queda guardado para revisar en Progreso.</p><div className="finish-stats"><span><strong>{completedSets}</strong> series</span><span><strong>{session.exercises.length}</strong> ejercicios</span><span><strong>{formatTime(elapsedSeconds)}</strong> tiempo</span></div><div className="finish-actions"><Link className="button button-primary" href="/progreso">Ver progreso <ChevronRight size={18} /></Link><button className="button button-quiet" type="button" onClick={restartWorkout}><RotateCcw size={18} /> Repetir rutina</button></div></section> :
-    <section className="workout-layout"><article className="workout-exercise"><div className={`workout-image demo-${demoMode} ${demoMode === "auto" ? "allow-motion" : ""}`}>{reference ? <><div className="technique-frame technique-start"><Image src={frameImage(reference.image, "inicio")} alt={`${exercise.name}: posición inicial`} fill loading="eager" sizes="(max-width: 900px) 100vw, 58vw" /></div><div className="technique-frame technique-end"><Image src={frameImage(reference.image, "final")} alt={`${exercise.name}: posición final`} fill loading="eager" sizes="(max-width: 900px) 100vw, 58vw" /></div><span className="technique-stage" aria-live="polite">{demoMode === "start" ? "Posición inicial" : demoMode === "end" ? "Posición final" : "Demostración automática"}</span><div className="technique-controls" role="group" aria-label="Controlar demostración del ejercicio"><button type="button" aria-pressed={demoMode === "auto"} onClick={() => setDemoMode("auto")}><Play size={15} aria-hidden="true" /> Animar</button><button type="button" aria-pressed={demoMode === "start"} onClick={() => setDemoMode("start")}>Inicio</button><button type="button" aria-pressed={demoMode === "end"} onClick={() => setDemoMode("end")}>Final</button></div></> : <Dumbbell size={64} />}</div><div className="workout-exercise-copy"><div className="workout-position"><span>Ejercicio {exerciseIndex + 1} de {session.exercises.length}</span><span>Serie {setIndex + 1} de {exercise.sets}</span></div><h1>{exercise.name}</h1><p className="workout-prescription">{exercise.repetitions} · {restDuration}s de descanso</p></div></article>
+    <section className="workout-layout"><article className="workout-exercise"><div className={`workout-image demo-${demoMode} ${demoMode === "auto" ? "allow-motion" : ""}`}><><div className="technique-frame technique-start"><Image src={frameImage(reference, "inicio")} alt={`${exercise.name}: posición inicial`} fill loading="eager" unoptimized={reference.generated} sizes="(max-width: 900px) 100vw, 58vw" /></div><div className="technique-frame technique-end"><Image src={frameImage(reference, "final")} alt={`${exercise.name}: posición final`} fill loading="eager" unoptimized={reference.generated} sizes="(max-width: 900px) 100vw, 58vw" /></div><span className="technique-stage" aria-live="polite">{isGeneratingReference ? "Creando referencia exacta · guía provisional" : demoMode === "start" ? "Posición inicial" : demoMode === "end" ? "Posición final" : "Demostración automática"}</span><div className="technique-controls" role="group" aria-label="Controlar demostración del ejercicio"><button type="button" aria-pressed={demoMode === "auto"} onClick={() => setDemoMode("auto")}><Play size={15} aria-hidden="true" /> Animar</button><button type="button" aria-pressed={demoMode === "start"} onClick={() => setDemoMode("start")}>Inicio</button><button type="button" aria-pressed={demoMode === "end"} onClick={() => setDemoMode("end")}>Final</button></div></></div><div className="workout-exercise-copy"><div className="workout-position"><span>Ejercicio {exerciseIndex + 1} de {session.exercises.length}</span><span>Serie {setIndex + 1} de {exercise.sets}</span></div><h1>{exercise.name}</h1><p className="workout-prescription">{exercise.repetitions} · {restDuration}s de descanso</p></div></article>
     <aside className={`workout-control ${controlsCollapsed ? "is-collapsed" : ""}`} aria-live="polite">
       <button className="workout-sheet-toggle" type="button" aria-expanded={!controlsCollapsed} aria-label={controlsCollapsed ? "Desplegar controles de la serie" : "Compactar controles de la serie"} onClick={() => setControlsCollapsed((current) => !current)}><span><strong>{phase === "rest" ? isLastSet ? "Rutina lista" : `Descanso ${formatTime(secondsLeft)}` : `Serie ${setIndex + 1} de ${exercise.sets}`}</strong><small>{exercise.name}</small></span>{controlsCollapsed ? <ChevronUp size={20} /> : <ChevronDown size={18} />}</button>
       {paused && <div className="workout-paused"><Pause size={24} /><strong>Rutina en pausa</strong><span>El tiempo y el descanso están detenidos.</span></div>}

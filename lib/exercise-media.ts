@@ -1,7 +1,11 @@
 export type ExerciseReference = {
   image: string;
+  startImage?: string;
+  endImage?: string;
   alt: string;
   cues: string[];
+  generated?: boolean;
+  isFallback?: boolean;
 };
 
 const references: Record<string, ExerciseReference> = {
@@ -58,10 +62,34 @@ function normalizeExerciseName(name: string) {
   return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
-export function getExerciseReference(name: string, biologicalSex?: "femenino" | "masculino") {
+function curatedReference(name: string) {
   const normalizedName = normalizeExerciseName(name);
   const alias = referenceAliases.find(({ pattern }) => pattern.test(normalizedName));
-  const reference = references[normalizedName] ?? (alias ? references[alias.key] : undefined);
-  if (!reference || !biologicalSex) return reference;
+  return references[normalizedName] ?? (alias ? references[alias.key] : undefined);
+}
+
+function fallbackReference(name: string) {
+  const normalizedName = normalizeExerciseName(name);
+  if (/cuello|cervical|nuca/.test(normalizedName)) return references["movilidad cervical en rango comodo"];
+  if (/hombro|escapul|brazo|codo|mano|muneca/.test(normalizedName)) return references["control escapular suave"];
+  if (/rodilla|cuadriceps|talon|tobillo|pie|pierna/.test(normalizedName)) return references["transferencia de peso con apoyo"];
+  if (/cadera|pelv|lumbar|espalda baja/.test(normalizedName)) return references["basculacion pelvica suave"];
+  if (/torax|toracic|espalda alta/.test(normalizedName)) return references["movilidad toracica con apoyo"];
+  if (/respir|relaja/.test(normalizedName)) return references["respiracion diafragmatica y relajacion"];
+  return references["caminata comoda y controlada"];
+}
+
+function referenceForSex(reference: ExerciseReference, biologicalSex?: "femenino" | "masculino") {
+  if (!biologicalSex) return reference;
   return { ...reference, image: reference.image.replace("/exercises/", `/exercises/${biologicalSex}/`) };
+}
+
+export function hasCuratedExerciseReference(name: string) {
+  return Boolean(curatedReference(name));
+}
+
+export function getExerciseReference(name: string, biologicalSex?: "femenino" | "masculino") {
+  const exact = curatedReference(name);
+  if (exact) return { ...referenceForSex(exact, biologicalSex), isFallback: false };
+  return { ...referenceForSex(fallbackReference(name), biologicalSex), isFallback: true };
 }

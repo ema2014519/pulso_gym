@@ -33,6 +33,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { generateWeeklyPlan, recoveryExercisesForCurrentPhase, sessionForContext, type ExperienceLevel, type FitnessGoal, type NutritionTargets, type PlanAssessment, type PlanMethodology, type PlannedSession, type WeeklyPlan } from "@/lib/training";
 import { getExerciseReference } from "@/lib/exercise-media";
+import { useExerciseReference, warmExerciseReferences } from "@/lib/use-exercise-reference";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { AmbientGymBackground } from "./ambient-gym-background";
 import { WorkoutReminders } from "./workout-reminders";
@@ -272,6 +273,14 @@ export function AppWorkspace({ view }: { view: AppView }) {
     void loadPlan();
     return () => { cancelled = true; };
   }, [supabase, planReloadKey]);
+  useEffect(() => {
+    if (!generatedPlan?.assessment?.biologicalSex) return;
+    const sessionExercises = generatedPlan.sessions.flatMap((session) => session.exercises.map((exercise) => ({ name: exercise.name })));
+    const recoveryExercises = generatedPlan.assessment.recovery?.phases?.flatMap((phase) => phase.exercises.map((exercise) => ({ name: exercise.name, instructions: exercise.instructions })))
+      ?? generatedPlan.assessment.recovery?.exercises?.map((exercise) => ({ name: exercise.name, instructions: exercise.instructions }))
+      ?? [];
+    void warmExerciseReferences([...sessionExercises, ...recoveryExercises], generatedPlan.assessment.biologicalSex);
+  }, [generatedPlan]);
   useEffect(() => {
     let cancelled = false;
 
@@ -574,13 +583,13 @@ export function AppWorkspace({ view }: { view: AppView }) {
   const visiblePlanSessions = generatedPlan?.sessions.filter((plannedSession) => planFilter === "todos" || plannedSession.context === planFilter) ?? [];
   const totalPlanMinutes = generatedPlan?.sessions.reduce((total, plannedSession) => total + plannedSession.durationMinutes, 0) ?? 0;
   const homeSessionCount = generatedPlan?.sessions.filter((plannedSession) => plannedSession.context === "casa").length ?? 0;
-  const activeReference = referenceExercise ? getExerciseReference(referenceExercise, generatedPlan?.assessment?.biologicalSex) : undefined;
+  const { reference: activeReference, isGenerating: isGeneratingReference } = useExerciseReference(referenceExercise ?? "", generatedPlan?.assessment?.biologicalSex);
 
   return (
     <main className="app-shell">
       <AmbientGymBackground />
       {planPendingDeletion && <div className="plan-delete-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !deletingPlanId) setPlanPendingDeletion(null); }}><section className="plan-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-delete-title" aria-describedby="plan-delete-description"><span className="plan-delete-icon" aria-hidden="true"><TriangleAlert size={25} /></span><div><p className="eyebrow">Acción permanente</p><h2 id="plan-delete-title">¿ELIMINAR “{planPendingDeletion.name.toUpperCase()}”?</h2><p id="plan-delete-description">También se eliminarán sus sesiones, ejercicios y registros de series. Esta acción no se puede deshacer.</p></div><div className="plan-delete-actions"><button ref={deleteCancelRef} className="button button-quiet" type="button" disabled={Boolean(deletingPlanId)} onClick={() => setPlanPendingDeletion(null)}>Conservar plan</button><button className="button button-danger" type="button" disabled={Boolean(deletingPlanId)} onClick={() => void deleteSelectedPlan()}>{deletingPlanId ? "Eliminando…" : "Eliminar definitivamente"}<Trash2 size={18} aria-hidden="true" /></button></div></section></div>}
-      {referenceExercise && activeReference && <div className="exercise-reference-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setReferenceExercise(null); }}><section className="exercise-reference-dialog" role="dialog" aria-modal="true" aria-labelledby="exercise-reference-title"><button className="exercise-reference-close" type="button" aria-label="Cerrar referencia" onClick={() => setReferenceExercise(null)}><X size={21} aria-hidden="true" /></button><div className="exercise-reference-image"><Image src={activeReference.image} alt={activeReference.alt} fill sizes="(max-width: 720px) 94vw, 760px" priority /></div><div className="exercise-reference-copy"><p className="eyebrow">Guía visual · inicio y final</p><h2 id="exercise-reference-title">{referenceExercise.toUpperCase()}</h2><ul>{activeReference.cues.map((cue) => <li key={cue}><CircleCheck size={17} aria-hidden="true" /> {cue}</li>)}</ul><p className="exercise-reference-note">La imagen es una referencia general. Detén el ejercicio si aparece dolor agudo o inusual.</p></div></section></div>}
+      {referenceExercise && activeReference && <div className="exercise-reference-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setReferenceExercise(null); }}><section className="exercise-reference-dialog" role="dialog" aria-modal="true" aria-labelledby="exercise-reference-title"><button className="exercise-reference-close" type="button" aria-label="Cerrar referencia" onClick={() => setReferenceExercise(null)}><X size={21} aria-hidden="true" /></button><div className="exercise-reference-image"><Image src={activeReference.image} alt={activeReference.alt} fill unoptimized={activeReference.generated} sizes="(max-width: 720px) 94vw, 760px" priority /></div><div className="exercise-reference-copy"><p className="eyebrow">{isGeneratingReference ? "Creando referencia exacta · mostrando guía provisional" : activeReference.generated ? "Guía visual generada y revisada · inicio y final" : "Guía visual · inicio y final"}</p><h2 id="exercise-reference-title">{referenceExercise.toUpperCase()}</h2><ul>{activeReference.cues.map((cue) => <li key={cue}><CircleCheck size={17} aria-hidden="true" /> {cue}</li>)}</ul><p className="exercise-reference-note">La imagen es una referencia general. Detén el ejercicio si aparece dolor agudo o inusual.</p></div></section></div>}
       <aside className="sidebar" aria-label="Navegación principal">
         <Link className="brand" href="/" aria-label="Pulso, inicio">
           <span className="brand-mark" aria-hidden="true"><Dumbbell size={20} /></span>
