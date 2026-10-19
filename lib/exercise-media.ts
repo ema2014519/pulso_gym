@@ -27,14 +27,41 @@ const references: Record<string, ExerciseReference> = {
   "sentadilla con pausa": { image: "/exercises/sentadilla-pausa-casa.webp", alt: "Posición inicial y posición baja de la sentadilla con pausa", cues: ["Mantén todo el pie apoyado", "Haz una pausa breve sin relajarte abajo", "Sube empujando el suelo de forma uniforme"] },
   flexiones: { image: "/exercises/flexiones-casa.webp", alt: "Posición inicial y final de la flexión de brazos en el suelo", cues: ["Alinea manos debajo de los hombros", "Mantén el cuerpo firme de cabeza a talones", "Acerca el pecho al suelo sin hundir la cadera"] },
   "puente de gluteos": { image: "/exercises/puente-gluteos-casa.webp", alt: "Posición inicial y final del puente de glúteos", cues: ["Apoya los pies cerca de los glúteos", "Eleva la cadera apretando los glúteos", "Evita arquear en exceso la zona lumbar"] },
+  "respiracion diafragmatica y relajacion": { image: "/exercises/respiracion-diafragmatica.webp", alt: "Posición inicial y final de la respiración diafragmática", cues: ["Coloca una mano en el pecho y otra en el abdomen", "Inhala lentamente sin elevar los hombros", "Deja que el abdomen se expanda de forma suave"] },
+  "movilidad cervical en rango comodo": { image: "/exercises/movilidad-cervical.webp", alt: "Inicio y final de una rotación cervical suave", cues: ["Mantén los hombros relajados", "Gira la cabeza despacio dentro de un rango cómodo", "Detente si aparece mareo, hormigueo o dolor creciente"] },
+  "control escapular suave": { image: "/exercises/control-escapular.webp", alt: "Posición inicial y final del control escapular contra la pared", cues: ["Apoya el cuerpo sin arquear la zona lumbar", "Lleva suavemente las escápulas hacia abajo y atrás", "Evita encoger los hombros o contener la respiración"] },
+  "movilidad toracica con apoyo": { image: "/exercises/movilidad-toracica.webp", alt: "Posición inicial y final de la rotación torácica sentada", cues: ["Mantén los pies apoyados y la pelvis estable", "Gira desde la parte alta del tronco", "Usa un recorrido cómodo sin forzar el cuello"] },
+  "balanceo de brazo sin carga": { image: "/exercises/balanceo-brazo.webp", alt: "Posición inicial y final del balanceo pendular del brazo", cues: ["Apoya una mano y deja el otro brazo relajado", "Inicia un balanceo corto con el movimiento del cuerpo", "No eleves activamente el hombro"] },
+  "deslizamiento asistido del brazo": { image: "/exercises/deslizamiento-brazo.webp", alt: "Posición inicial y final del deslizamiento asistido del brazo sobre una mesa", cues: ["Apoya la mano sobre una toalla", "Desliza el brazo mientras inclinas ligeramente el tronco", "Mantén el hombro relajado y trabaja sin dolor intenso"] },
+  "contraccion isometrica suave de cuadriceps": { image: "/exercises/isometrico-cuadriceps.webp", alt: "Posición para la contracción isométrica de cuádriceps", cues: ["Coloca una toalla enrollada debajo de la rodilla", "Presiona la rodilla suavemente contra la toalla", "Mantén el talón apoyado y respira con normalidad"] },
+  "deslizamiento de talon": { image: "/exercises/deslizamiento-talon.webp", alt: "Posición inicial y final del deslizamiento de talón", cues: ["Mantén el talón en contacto con el suelo", "Acerca el pie lentamente sin forzar la rodilla", "Conserva la pelvis estable durante el recorrido"] },
+  "transferencia de peso con apoyo": { image: "/exercises/transferencia-peso.webp", alt: "Posición inicial y final de la transferencia de peso con apoyo", cues: ["Usa el apoyo solo para mantener el equilibrio", "Desplaza el peso de forma gradual sin levantar los pies", "Mantén las rodillas suaves y el tronco erguido"] },
+  "basculacion pelvica suave": { image: "/exercises/basculacion-pelvica.webp", alt: "Posición inicial y final de la basculación pélvica acostada", cues: ["Apoya ambos pies y relaja la espalda", "Activa suavemente el abdomen para acercar la zona lumbar al suelo", "No eleves la cadera como en un puente"] },
+  "caminata comoda y controlada": { image: "/exercises/caminata-controlada.webp", alt: "Dos posiciones consecutivas de una caminata cómoda y controlada", cues: ["Camina a un ritmo que permita hablar con normalidad", "Mantén pasos cómodos y una postura relajada", "Reduce o detén la marcha si los síntomas aumentan"] },
 };
+
+const referenceAliases: Array<{ pattern: RegExp; key: keyof typeof references }> = [
+  { pattern: /respiracion.*(diafrag|abdomin)|diafrag.*respiracion/, key: "respiracion diafragmatica y relajacion" },
+  { pattern: /(movilidad|rotacion).*cervical|cervical.*(movilidad|rotacion)/, key: "movilidad cervical en rango comodo" },
+  { pattern: /(control|retraccion|activacion).*escapul|escapul.*(control|retraccion|activacion)/, key: "control escapular suave" },
+  { pattern: /(movilidad|rotacion).*toracic|toracic.*(movilidad|rotacion)/, key: "movilidad toracica con apoyo" },
+  { pattern: /(balanceo|pendulo|pendular|codman).*(brazo|hombro)|(brazo|hombro).*(balanceo|pendulo|pendular|codman)/, key: "balanceo de brazo sin carga" },
+  { pattern: /(deslizamiento|deslizar).*(brazo|hombro).*(mesa|apoyo|asist)|(brazo|hombro).*(deslizamiento|deslizar).*(mesa|apoyo|asist)/, key: "deslizamiento asistido del brazo" },
+  { pattern: /(isometr|contraccion).*(cuadriceps)|cuadriceps.*(isometr|contraccion)/, key: "contraccion isometrica suave de cuadriceps" },
+  { pattern: /(deslizamiento|deslizar).*(talon)|talon.*(deslizamiento|deslizar)/, key: "deslizamiento de talon" },
+  { pattern: /(transferencia|cambio|desplazamiento).*(peso).*(apoyo|de pie)|(peso).*(transferencia|cambio|desplazamiento)/, key: "transferencia de peso con apoyo" },
+  { pattern: /(basculacion|inclinacion).*(pelv)|pelv.*(basculacion|inclinacion)/, key: "basculacion pelvica suave" },
+  { pattern: /(caminata|caminar|marcha).*(comoda|controlada|suave)|(marcha controlada)/, key: "caminata comoda y controlada" },
+];
 
 function normalizeExerciseName(name: string) {
   return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
 export function getExerciseReference(name: string, biologicalSex?: "femenino" | "masculino") {
-  const reference = references[normalizeExerciseName(name)];
+  const normalizedName = normalizeExerciseName(name);
+  const alias = referenceAliases.find(({ pattern }) => pattern.test(normalizedName));
+  const reference = references[normalizedName] ?? (alias ? references[alias.key] : undefined);
   if (!reference || !biologicalSex) return reference;
   return { ...reference, image: reference.image.replace("/exercises/", `/exercises/${biologicalSex}/`) };
 }
