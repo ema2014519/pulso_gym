@@ -1298,9 +1298,18 @@ body { overflow-x: hidden; }
 .workout-exercise{border-color:transparent}
 .rest-duration-field{grid-column:1/-1}.rest-next{display:flex;width:100%;min-height:54px;align-items:center;justify-content:center;gap:8px;margin-top:16px}.rest-next:disabled{cursor:not-allowed;opacity:.45}.rest-panel .rest-actions{margin-top:2px}
 .workout-control-scroll{max-height:680px;overflow-y:auto;overscroll-behavior:contain;padding-right:4px;scrollbar-color:#f97316 #293136;scrollbar-width:thin}
-.series-exercise-details{margin-top:18px;padding-top:17px;border-top:1px solid #394247}
-.series-exercise-details>header{margin-bottom:12px}
-.series-exercise-details>header h3{margin:4px 0 0;font-family:"Barlow Condensed",Impact,sans-serif;font-size:1.55rem;line-height:.95;text-transform:uppercase}
+.series-exercise-details{margin-top:18px;border:1px solid #394247;border-radius:11px;background:rgb(10 14 16/.38)}
+.series-exercise-details>summary{display:flex;min-height:52px;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;color:#eef2f3;cursor:pointer;list-style:none}
+.series-exercise-details>summary::-webkit-details-marker{display:none}
+.series-exercise-details>summary>span{display:grid;min-width:0;gap:2px}
+.series-exercise-details>summary small{color:#89949b;font-size:.58rem;font-weight:850;letter-spacing:.07em;text-transform:uppercase}
+.series-exercise-details>summary strong{font-size:.76rem;text-transform:uppercase}
+.series-exercise-details>summary svg{flex:none;color:#f97316;transition:transform .18s ease}
+.series-exercise-details[open]>summary{border-bottom:1px solid #394247}
+.series-exercise-details[open]>summary svg{transform:rotate(180deg)}
+.series-exercise-details-content{padding:14px}
+.series-exercise-details-content>header{margin-bottom:12px}
+.series-exercise-details-content>header h3{margin:4px 0 0;font-family:"Barlow Condensed",Impact,sans-serif;font-size:1.55rem;line-height:.95;text-transform:uppercase}
 .exercise-details-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:20px}
 .exercise-details-stats span{display:grid;gap:5px;padding:12px 8px;border:1px solid #394247;border-radius:10px;background:#1b2225;text-align:center}
 .exercise-details-stats small{color:#939ea5;font-size:.58rem;font-weight:800;text-transform:uppercase}
@@ -1424,16 +1433,21 @@ body { overflow-x: hidden; }
   .workout-control{overflow:hidden;padding-bottom:70px;transition:height .28s cubic-bezier(.2,.8,.2,1),border-radius .28s ease}
   .workout-sheet-toggle{position:absolute;top:0;left:50%;z-index:15;display:grid;width:70px;height:25px;place-items:center;padding:0;border:0;background:transparent;color:#6d7471;transform:translateX(-50%)}
   .workout-sheet-toggle>span{display:none}
-  .workout-step-nav{position:absolute;right:14px;bottom:9px;left:14px;z-index:14;display:grid;height:52px;grid-template-columns:52px 1fr 52px;align-items:center;gap:10px}
+  .workout-step-nav{position:absolute;right:14px;bottom:max(9px,env(safe-area-inset-bottom));left:14px;z-index:14;display:grid;height:52px;grid-template-columns:48px minmax(54px,1fr) minmax(128px,auto);align-items:center;gap:8px}
   .workout-step-nav>button{display:grid;width:48px;height:48px;place-items:center;border:1px solid #d1d5d2;border-radius:50%;background:#fff;color:#202321;box-shadow:0 5px 15px rgb(20 24 22/.09)}
-  .workout-step-nav>button.is-next{justify-self:end;border-color:#d9caff;background:#cbb7ff;color:#1b1724}
+  .workout-step-nav>button.is-next{display:flex;width:auto;min-width:128px;justify-self:end;justify-content:center;gap:5px;padding:0 12px;border-color:#d9caff;border-radius:999px;background:#cbb7ff;color:#1b1724}
+  .workout-step-nav>button.is-next span{font-size:.64rem;font-weight:900;letter-spacing:.025em;text-transform:uppercase;white-space:nowrap}
   .workout-step-nav>button:disabled{cursor:not-allowed;opacity:.35;box-shadow:none}
   .workout-step-nav>div{display:grid;justify-items:center;line-height:1}
   .workout-step-nav small{margin-bottom:3px;color:#777e7a;font-size:.59rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
   .workout-step-nav time{color:#161918;font-family:monospace;font-size:1.5rem;font-weight:900;font-variant-numeric:tabular-nums}
   .workout-control-scroll{height:100%;max-height:none;overflow-y:auto;overscroll-behavior:contain;padding:0 3px 18px 0;scrollbar-color:#f97316 #e5e8e5}
-  .series-exercise-details{margin-top:16px;padding-top:15px;border-top-color:#d9ddda}
-  .series-exercise-details>header h3{color:#171a18}
+  .series-exercise-details{margin-top:12px;border-color:#d9ddda;background:#fff}
+  .series-exercise-details>summary{min-height:48px;padding:7px 10px;color:#171a18}
+  .series-exercise-details>summary small{color:#737b77}
+  .series-exercise-details[open]>summary{border-bottom-color:#d9ddda}
+  .series-exercise-details-content{padding:12px 10px}
+  .series-exercise-details-content>header h3{color:#171a18}
   .exercise-details-stats span{border-color:#d9ddda;background:#fff}
   .exercise-details-stats small{color:#737b77}
   .series-exercise-advice li{background:#ecefeb;color:#303532}
@@ -1886,11 +1900,11 @@ canvas { max-width: 100%; }
 }
 .exercise-youtube-link:hover { border-color: #f97316; background: rgb(124 55 16 / 50%); color: #fff; }
 .exercise-youtube-link:active { background: rgb(154 52 18 / 58%); }
-.series-exercise-details > .exercise-youtube-link { width: 100%; margin: 0 0 14px; }
+.series-exercise-details-content > .exercise-youtube-link { width: 100%; margin: 0 0 14px; }
 
 @media (max-width: 520px) {
-  .series-exercise-details > .exercise-youtube-link { border-color: #ed9d63; background: #fff3e8; color: #8f3f0a; }
-  .series-exercise-details > .exercise-youtube-link:hover { border-color: #e86610; background: #ffe5d0; color: #6f2f08; }
+  .series-exercise-details-content > .exercise-youtube-link { border-color: #ed9d63; background: #fff3e8; color: #8f3f0a; }
+  .series-exercise-details-content > .exercise-youtube-link:hover { border-color: #e86610; background: #ffe5d0; color: #6f2f08; }
   .exercise-reference-copy > .exercise-youtube-link { width: 100%; }
 }
 

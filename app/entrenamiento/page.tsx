@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, CirclePlay as Youtube, Clock3, Dumbbell, Pause, Play, Plus, RotateCcw, SkipForward, Trophy } from "lucide-react";
 import { AmbientGymBackground } from "../ambient-gym-background";
 import { getExerciseYouTubeSearchUrl, type ExerciseReference } from "@/lib/exercise-media";
@@ -69,6 +69,7 @@ export default function GuidedWorkoutPage() {
   const [restDurations, setRestDurations] = useState<Record<number, number>>({});
   const [controlsCollapsed, setControlsCollapsed] = useState(false);
   const [ready, setReady] = useState(false);
+  const controlScrollRef = useRef<HTMLDivElement>(null);
 
   const exercise = session?.exercises[exerciseIndex];
   const recoveryPrescription = exercise ? recoveryExercises.find((item) => item.name.trim().toLocaleLowerCase() === exercise.name.trim().toLocaleLowerCase()) : undefined;
@@ -138,6 +139,10 @@ export default function GuidedWorkoutPage() {
     window.localStorage.setItem(storageKey, JSON.stringify({ exerciseIndex, setIndex, phase, secondsLeft, elapsedSeconds, completedSets, startedAt, restDurations } satisfies StoredWorkout));
   }, [completedSets, elapsedSeconds, exerciseIndex, phase, ready, restDurations, secondsLeft, setIndex, startedAt, storageKey]);
 
+  useEffect(() => {
+    controlScrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [exerciseIndex, phase, setIndex]);
+
   async function finishSet() {
     if (!exercise || !session) return;
     setControlsCollapsed(false);
@@ -171,6 +176,7 @@ export default function GuidedWorkoutPage() {
     setRepetitions(numericDose(targetExercise.repetitions)); setCompletedDose(targetExercise.repetitions);
     setDemoMode("start");
     setPhase("exercise");
+    setControlsCollapsed(false);
     setSecondsLeft(0);
     setPain("0");
     setMessage("");
@@ -204,6 +210,16 @@ export default function GuidedWorkoutPage() {
   if (!ready) return <main className="workout-page"><p className="workout-state">Preparando tu rutina…</p></main>;
   if (!session || !exercise) return <main className="workout-page"><AmbientGymBackground /><section className="workout-empty"><Dumbbell size={34} /><h1>NO ENCONTRAMOS LA RUTINA.</h1><p>Regresa a Mi plan y elige la sesión que quieres comenzar.</p><Link className="button button-primary" href="/plan">Ir a Mi plan</Link></section></main>;
 
+  const nextStepLabel = phase === "rest"
+    ? isLastSet
+      ? "Finalizar rutina"
+      : setIndex + 1 < exercise.sets
+        ? `Ir a serie ${setIndex + 2}`
+        : "Siguiente ejercicio"
+    : isReviewingCompletedSet
+      ? "Volver a serie actual"
+      : "Completar serie";
+
   return <main className="workout-page">
     <AmbientGymBackground />
     <header className="workout-header"><Link href="/plan" className="workout-back"><ArrowLeft size={19} /> Guardar y salir</Link><div><span>{planName}</span><strong>{session.day} · {session.focus}</strong></div><button type="button" className="workout-pause" onClick={() => setPaused((current) => !current)} aria-pressed={paused}>{paused ? <Play size={18} /> : <Pause size={18} />} {paused ? "Continuar" : "Pausar"}</button></header>
@@ -213,19 +229,19 @@ export default function GuidedWorkoutPage() {
     <aside className={`workout-control ${controlsCollapsed ? "is-collapsed" : ""}`} aria-live="polite">
       <button className="workout-sheet-toggle" type="button" aria-expanded={!controlsCollapsed} aria-label={controlsCollapsed ? "Desplegar controles de la serie" : "Compactar controles de la serie"} onClick={() => setControlsCollapsed((current) => !current)}><span><strong>{phase === "rest" ? isLastSet ? "Rutina lista" : `Descanso ${formatTime(secondsLeft)}` : `Serie ${setIndex + 1} de ${exercise.sets}`}</strong><small>{exercise.name}</small></span>{controlsCollapsed ? <ChevronUp size={20} /> : <ChevronDown size={18} />}</button>
       {paused && <div className="workout-paused"><Pause size={24} /><strong>Rutina en pausa</strong><span>El tiempo y el descanso están detenidos.</span></div>}
-      <div className="workout-control-scroll">
+      <div ref={controlScrollRef} className="workout-control-scroll">
       {phase === "rest" ? <div className="rest-panel">
         <p className="eyebrow">{isLastSet ? "Todas las series listas" : "Serie completada"}</p>
         <h2>{isLastSet ? "TERMINASTE" : "DESCANSO"}</h2>
         {!isLastSet && <><time>{formatTime(secondsLeft)}</time><div className="rest-ring" style={{ "--rest-progress": `${Math.max(0, (secondsLeft / Math.max(1, restDuration)) * 360)}deg` } as React.CSSProperties}><Clock3 size={26} /></div><p>{secondsLeft > 0 ? "Respira y prepárate para la siguiente serie." : "Descanso terminado. Avanza cuando estés listo."}</p><div className="rest-actions"><button type="button" onClick={() => setSecondsLeft((current) => current + 30)}><Plus size={17} /> 30 s</button><button type="button" onClick={() => setSecondsLeft(0)}>Omitir <SkipForward size={17} /></button></div></>}
         <button className="button button-primary rest-next" type="button" disabled={paused || (!isLastSet && secondsLeft > 0)} onClick={moveAfterRest}>{isLastSet ? "Finalizar rutina" : setIndex + 1 < exercise.sets ? `Siguiente: serie ${setIndex + 2}` : "Siguiente ejercicio"} <ChevronRight size={20} /></button>
       </div> : <><div className="set-heading"><div><p className="eyebrow">Registra esta serie</p><h2>SERIE {setIndex + 1}</h2></div><span>{completedSets}/{totalSets}</span></div><div className="set-fields">{recoveryPrescription ? <label>Dosis completada<input type="text" value={completedDose} onChange={(event) => setCompletedDose(event.target.value)} /></label> : <label>Repeticiones<input inputMode="numeric" type="number" min="0" value={repetitions} onChange={(event) => setRepetitions(event.target.value)} /></label>}<label>Peso (kg)<input inputMode="decimal" type="number" min="0" step="0.5" placeholder="Opcional" value={loadKg} onChange={(event) => setLoadKg(event.target.value)} /></label><label>Esfuerzo<select value={effort} onChange={(event) => setEffort(event.target.value)}>{[1,2,3,4,5,6,7,8,9,10].map((value) => <option key={value} value={value}>{value}/10</option>)}</select></label><label>Dolor<select value={pain} onChange={(event) => setPain(event.target.value)}>{[0,1,2,3,4,5,6,7,8,9,10].map((value) => <option key={value} value={value}>{value}/10</option>)}</select></label><label className="rest-duration-field">Descanso (segundos)<input inputMode="numeric" type="number" min="0" step="1" value={restDuration} onChange={(event) => { const value = Math.max(0, Number(event.target.value) || 0); setRestDurations((current) => ({ ...current, [exerciseIndex]: value })); }} /></label></div>{Number(pain) >= 5 && <div className="pain-alert"><CircleAlert size={19} /><span><strong>Detén este ejercicio.</strong> Evita el movimiento y consulta a un profesional si el dolor persiste.</span></div>}{message && <p className="workout-message" role="status">{message}</p>}<button className="button button-primary complete-set" type="button" disabled={paused || Number(pain) >= 5} onClick={() => void finishSet()}>Completar serie <Check size={19} /></button></>}
-      {(reference || recoveryPrescription) && <section className="series-exercise-details" aria-labelledby="series-exercise-details-title"><header><p className="eyebrow">Detalles del ejercicio</p><h3 id="series-exercise-details-title">{exercise.name}</h3></header><div className="exercise-details-stats"><span><small>Series</small><strong>{exercise.sets}</strong></span><span><small>Dosis</small><strong>{exercise.repetitions}</strong></span><span><small>Descanso</small><strong>{restDuration}s</strong></span></div>{recoveryPrescription && <div className="series-exercise-advice"><p className="eyebrow">Indicaciones del plan</p><ul><li><Check size={18} aria-hidden="true" /><span>{recoveryPrescription.instructions}</span></li><li><Check size={18} aria-hidden="true" /><span>Objetivo: {recoveryPrescription.purpose}</span></li></ul></div>}{reference && <div className="series-exercise-advice"><p className="eyebrow">Consejos técnicos</p><ul>{reference.cues.map((cue) => <li key={cue}><Check size={18} aria-hidden="true" /><span>{cue}</span></li>)}</ul></div>}<a className="exercise-youtube-link" href={getExerciseYouTubeSearchUrl(exercise.name)} target="_blank" rel="noopener noreferrer" aria-label={`Buscar técnica de ${exercise.name} en YouTube; abre una pestaña nueva`}><Youtube size={19} aria-hidden="true" /> Ver técnica en YouTube</a><div className="exercise-details-safety"><p className="eyebrow">Durante la serie</p><h3>Escucha a tu cuerpo</h3><p>{recoveryPrescription ? `Detén este ejercicio si: ${recoveryPrescription.stopIf}` : "Usa un peso que te permita mantener la técnica. Detén el ejercicio si aparece dolor agudo, mareo o una molestia que aumenta con cada repetición."}</p></div></section>}
+      {(reference || recoveryPrescription) && <details key={`${exerciseIndex}-${setIndex}`} className="series-exercise-details"><summary><span><small>Ayuda opcional</small><strong>Detalles del ejercicio</strong></span><ChevronDown size={19} aria-hidden="true" /></summary><div className="series-exercise-details-content"><header><p className="eyebrow">Técnica y seguridad</p><h3>{exercise.name}</h3></header><div className="exercise-details-stats"><span><small>Series</small><strong>{exercise.sets}</strong></span><span><small>Dosis</small><strong>{exercise.repetitions}</strong></span><span><small>Descanso</small><strong>{restDuration}s</strong></span></div>{recoveryPrescription && <div className="series-exercise-advice"><p className="eyebrow">Indicaciones del plan</p><ul><li><Check size={18} aria-hidden="true" /><span>{recoveryPrescription.instructions}</span></li><li><Check size={18} aria-hidden="true" /><span>Objetivo: {recoveryPrescription.purpose}</span></li></ul></div>}{reference && <div className="series-exercise-advice"><p className="eyebrow">Consejos técnicos</p><ul>{reference.cues.map((cue) => <li key={cue}><Check size={18} aria-hidden="true" /><span>{cue}</span></li>)}</ul></div>}<a className="exercise-youtube-link" href={getExerciseYouTubeSearchUrl(exercise.name)} target="_blank" rel="noopener noreferrer" aria-label={`Buscar técnica de ${exercise.name} en YouTube; abre una pestaña nueva`}><Youtube size={19} aria-hidden="true" /> Ver técnica en YouTube</a><div className="exercise-details-safety"><p className="eyebrow">Durante la serie</p><h3>Escucha a tu cuerpo</h3><p>{recoveryPrescription ? `Detén este ejercicio si: ${recoveryPrescription.stopIf}` : "Usa un peso que te permita mantener la técnica. Detén el ejercicio si aparece dolor agudo, mareo o una molestia que aumenta con cada repetición."}</p></div></div></details>}
       </div>
       <nav className="workout-step-nav" aria-label="Navegar entre series">
         <button type="button" aria-label="Volver a la serie anterior" disabled={paused || (phase !== "rest" && currentSetNumber <= 0)} onClick={goToPreviousSet}><ChevronLeft size={23} /></button>
         <div><small>{phase === "rest" ? "Descanso" : "Tiempo"}</small><time>{formatTime(phase === "rest" ? secondsLeft : elapsedSeconds)}</time></div>
-        <button className="is-next" type="button" aria-label={phase === "rest" && isLastSet ? "Finalizar rutina" : isReviewingCompletedSet ? "Volver a la serie actual" : "Completar y avanzar"} disabled={paused || (phase === "exercise" && !isReviewingCompletedSet && Number(pain) >= 5)} onClick={() => void goToNextSet()}>{phase === "rest" && isLastSet ? <Check size={22} /> : <ChevronRight size={23} />}</button>
+        <button className="is-next" type="button" aria-label={nextStepLabel} disabled={paused || (phase === "exercise" && !isReviewingCompletedSet && Number(pain) >= 5)} onClick={() => void goToNextSet()}><span>{nextStepLabel}</span>{phase === "rest" && isLastSet ? <Check size={21} /> : <ChevronRight size={21} />}</button>
       </nav>
     </aside></section>}
   </main>;
