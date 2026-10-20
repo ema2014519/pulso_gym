@@ -103,12 +103,15 @@ async function generateImage(prompt: string) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY no está configurada.");
   const client = new GoogleGenAI({ apiKey });
-  const interaction = await client.interactions.create({
+  const response = await client.models.generateContent({
     model: process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image",
-    input: prompt,
-    response_format: { type: "image", mime_type: "image/jpeg", aspect_ratio: "16:9", image_size: "1K" },
+    contents: prompt,
+    config: {
+      responseModalities: ["IMAGE"],
+      imageConfig: { aspectRatio: "16:9", imageSize: "1K" },
+    },
   });
-  const encoded = interaction.output_image?.data;
+  const encoded = response.candidates?.[0]?.content?.parts?.find((part) => part.inlineData?.data)?.inlineData?.data;
   if (!encoded) throw new Error("Gemini no devolvió una imagen.");
   return Buffer.from(encoded, "base64");
 }
