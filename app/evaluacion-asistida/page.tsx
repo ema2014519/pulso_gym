@@ -124,6 +124,22 @@ export default function EvaluacionAsistidaPage() {
 
   const hasCompleteRevision = !revisionPlan || (planRevision.sessions.length === summary.daysPerWeek && planRevision.sessions.every((session) => session.exercises.length > 0));
   const canGeneratePlan = stage === "ready" && validPlanSummary(summary) && hasCompleteRevision;
+  const planActionLabel = creatingPlan
+    ? revisionPlan ? "Guardando actualización…" : "Creando y guardando…"
+    : canGeneratePlan
+      ? revisionPlan ? "Guardar actualización" : summary.planMode === "fitness" ? "Generar mi plan" : "Generar plan de recuperación"
+      : revisionPlan ? "Actualización pendiente" : "Plan pendiente";
+  const planActionStatus = creatingPlan
+    ? "Estamos guardando el plan. No cierres esta pantalla."
+    : canGeneratePlan
+      ? revisionPlan ? "La nueva versión está lista para guardarse." : "Tu plan está listo para generarse."
+      : stage === "urgent"
+        ? "La conversación detectó señales que requieren atención profesional."
+        : missingInformation.length > 0
+          ? `Faltan ${missingInformation.length} ${missingInformation.length === 1 ? "dato" : "datos"} por confirmar en el chat.`
+          : revisionPlan && !hasCompleteRevision
+            ? "Pulso IA todavía está completando todas las sesiones de la nueva versión."
+            : "Continúa la conversación hasta que Pulso IA confirme que el plan está listo.";
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -354,6 +370,10 @@ export default function EvaluacionAsistidaPage() {
         {stage === "urgent" && <div className="chat-urgent"><CircleAlert size={21} /><div><strong>No generaremos un plan automáticamente con estas señales.</strong><p>Busca orientación profesional. Puedes conservar la conversación y volver cuando tengas indicaciones seguras.</p></div></div>}
 
         <div className="chat-composer">
+          <div className={`chat-mobile-plan-action${canGeneratePlan ? " is-ready" : ""}`}>
+            <span><small>{revisionPlan ? "Actualización del plan" : "Creación del plan"}</small><strong role="status" aria-live="polite">{planActionStatus}</strong></span>
+            <button type="button" className="button button-primary chat-generate" aria-disabled={!canGeneratePlan || creatingPlan} onClick={() => void createPlan()}>{creatingPlan ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}{planActionLabel}</button>
+          </div>
           <textarea value={input} maxLength={2000} rows={2} placeholder="Escribe tus dudas, síntomas, objetivos o responde a Pulso IA…" onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} />
           <div><button type="button" className={listening ? "is-listening" : ""} aria-label={listening ? "Detener dictado" : "Responder por voz"} onClick={toggleVoice}>{listening ? <MicOff size={19} /> : <Mic size={19} />}</button><button type="button" aria-label="Abrir cámara" onClick={() => { setCameraInstruction((current) => current || "Muestra y señala la zona sobre la que estás conversando."); void openCamera(); }}><Paperclip size={19} /></button><button type="button" className="chat-send" aria-label="Enviar mensaje" aria-disabled={sending || !input.trim()} onClick={() => void sendMessage()}>{sending ? <LoaderCircle className="spin" size={19} /> : <ArrowUp size={20} />}</button></div>
         </div>
@@ -367,8 +387,8 @@ export default function EvaluacionAsistidaPage() {
         {summary.painPoints.length > 0 && <div className="chat-pain-summary"><strong>Puntos registrados</strong>{summary.painPoints.map((point) => <span key={point}>{point}</span>)}</div>}
         {missingInformation.length > 0 && <details className="chat-missing"><summary>Información pendiente ({missingInformation.length})</summary><ul>{missingInformation.map((item) => <li key={item}>{item}</li>)}</ul></details>}
         {revisionPlan && planRevision.changeSummary.length > 0 && <details className="chat-missing"><summary>Cambios preparados ({planRevision.changeSummary.length})</summary><ul>{planRevision.changeSummary.map((item) => <li key={item}>{item}</li>)}</ul></details>}
-        <button type="button" className="button button-primary chat-generate" aria-disabled={!canGeneratePlan || creatingPlan} onClick={() => void createPlan()}>{creatingPlan ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}{creatingPlan ? "Creando y guardando…" : canGeneratePlan ? revisionPlan ? "Guardar nueva versión" : summary.planMode === "fitness" ? "Generar mi plan" : "Generar plan de recuperación" : "Completa la conversación"}</button>
-        <small className="chat-generate-note">El plan se crea únicamente cuando tú lo solicitas y se guarda como un plan nuevo.</small>
+        <button type="button" className="button button-primary chat-generate" aria-disabled={!canGeneratePlan || creatingPlan} onClick={() => void createPlan()}>{creatingPlan ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}{planActionLabel}</button>
+        <small className="chat-generate-note">{planActionStatus} El plan se guarda como una nueva versión para conservar el anterior.</small>
       </aside>
     </section>
 

@@ -1865,3 +1865,67 @@ canvas { max-width: 100%; }
   .day-number { width: 29px; height: 29px; }
   .bottom-nav .bottom-nav-item span { font-size: .5rem; }
 }
+
+/* Referencia externa opcional: conserva la imagen local como guía principal. */
+.exercise-youtube-link {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 15px;
+  padding: 0 15px;
+  border: 1px solid rgb(249 115 22 / 48%);
+  border-radius: 10px;
+  background: rgb(82 42 18 / 38%);
+  color: #fed7aa;
+  font-size: .76rem;
+  font-weight: 850;
+  text-decoration: none;
+  transition: border-color .18s ease, background-color .18s ease, color .18s ease;
+}
+.exercise-youtube-link:hover { border-color: #f97316; background: rgb(124 55 16 / 50%); color: #fff; }
+.exercise-youtube-link:active { background: rgb(154 52 18 / 58%); }
+.series-exercise-details > .exercise-youtube-link { width: 100%; margin: 0 0 14px; }
+
+@media (max-width: 520px) {
+  .series-exercise-details > .exercise-youtube-link { border-color: #ed9d63; background: #fff3e8; color: #8f3f0a; }
+  .series-exercise-details > .exercise-youtube-link:hover { border-color: #e86610; background: #ffe5d0; color: #6f2f08; }
+  .exercise-reference-copy > .exercise-youtube-link { width: 100%; }
+}
+
+/* Acción final del chat: el panel lateral se oculta en móvil, por eso la CTA vive también en el compositor. */
+.chat-mobile-plan-action { display: none; }
+
+@media (max-width: 900px) {
+  .chat-composer > .chat-mobile-plan-action {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(190px, auto);
+    align-items: center;
+    justify-content: stretch;
+    gap: 10px;
+    padding: 9px;
+    border: 1px solid #3d474e;
+    border-radius: 12px;
+    background: #171d20;
+  }
+  .chat-mobile-plan-action > span { display: grid; min-width: 0; gap: 2px; }
+  .chat-mobile-plan-action small { color: #9aa5ad; font-size: .6rem; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
+  .chat-mobile-plan-action strong { color: #e1e6e9; font-size: .72rem; line-height: 1.35; }
+  .chat-mobile-plan-action.is-ready { border-color: rgb(185 231 105 / 45%); background: rgb(39 56 29 / 48%); }
+  .chat-mobile-plan-action.is-ready strong { color: #e8f9c9; }
+  .chat-composer .chat-mobile-plan-action .chat-generate {
+    display: flex;
+    width: 100%;
+    min-height: 48px;
+    height: auto;
+    margin: 0;
+    padding: 9px 13px;
+    gap: 7px;
+  }
+}
+
+@media (max-width: 560px) {
+  .chat-composer > .chat-mobile-plan-action { grid-template-columns: 1fr; padding: 8px; }
+  .chat-mobile-plan-action > span { padding-inline: 2px; }
+}

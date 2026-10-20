@@ -44,6 +44,50 @@ const references: Record<string, ExerciseReference> = {
   "caminata comoda y controlada": { image: "/exercises/caminata-controlada.webp", alt: "Dos posiciones consecutivas de una caminata cómoda y controlada", cues: ["Camina a un ritmo que permita hablar con normalidad", "Mantén pasos cómodos y una postura relajada", "Reduce o detén la marcha si los síntomas aumentan"] },
 };
 
+const canonicalNames: Record<keyof typeof references, string> = {
+  "sentadilla guiada": "Sentadilla guiada",
+  "peso muerto rumano": "Peso muerto rumano",
+  "prensa de piernas": "Prensa de piernas",
+  plancha: "Plancha",
+  "press de pecho con mancuernas": "Press de pecho con mancuernas",
+  "jalon al pecho": "Jalón al pecho",
+  "press de hombros": "Press de hombros",
+  "pallof press": "Pallof press",
+  "sentadilla goblet": "Sentadilla goblet",
+  "remo en maquina": "Remo en máquina",
+  "press de pecho": "Press de pecho",
+  "peso muerto con mancuernas": "Peso muerto con mancuernas",
+  "sentadilla bulgara": "Sentadilla búlgara",
+  "peso muerto con mancuernas o mochila": "Peso muerto con mancuernas o mochila",
+  "zancadas atras": "Zancadas atrás",
+  "flexiones inclinadas": "Flexiones inclinadas",
+  "remo con banda o mochila": "Remo con banda o mochila",
+  "press con mancuernas o pike push-up": "Press con mancuernas o pike push-up",
+  "dead bug": "Dead bug",
+  "sentadilla con pausa": "Sentadilla con pausa",
+  flexiones: "Flexiones",
+  "puente de gluteos": "Puente de glúteos",
+  "respiracion diafragmatica y relajacion": "Respiración diafragmática y relajación",
+  "movilidad cervical en rango comodo": "Movilidad cervical en rango cómodo",
+  "control escapular suave": "Control escapular suave",
+  "movilidad toracica con apoyo": "Movilidad torácica con apoyo",
+  "balanceo de brazo sin carga": "Balanceo de brazo sin carga",
+  "deslizamiento asistido del brazo": "Deslizamiento asistido del brazo",
+  "contraccion isometrica suave de cuadriceps": "Contracción isométrica suave de cuádriceps",
+  "deslizamiento de talon": "Deslizamiento de talón",
+  "transferencia de peso con apoyo": "Transferencia de peso con apoyo",
+  "basculacion pelvica suave": "Basculación pélvica suave",
+  "caminata comoda y controlada": "Caminata cómoda y controlada",
+};
+
+export const EXERCISE_CATALOG_NAMES = Object.freeze(Object.values(canonicalNames));
+
+export const EXERCISE_CATALOG_FOR_PROMPT = `
+FUERZA Y GIMNASIO: ${EXERCISE_CATALOG_NAMES.slice(0, 12).join(", ")}.
+CASA Y PESO CORPORAL: ${EXERCISE_CATALOG_NAMES.slice(12, 22).join(", ")}.
+MOVILIDAD Y RECUPERACIÓN: ${EXERCISE_CATALOG_NAMES.slice(22).join(", ")}.
+`.trim();
+
 const referenceAliases: Array<{ pattern: RegExp; key: keyof typeof references }> = [
   { pattern: /respiracion.*(diafrag|abdomin)|diafrag.*respiracion/, key: "respiracion diafragmatica y relajacion" },
   { pattern: /(movilidad|rotacion).*cervical|cervical.*(movilidad|rotacion)/, key: "movilidad cervical en rango comodo" },
@@ -66,6 +110,22 @@ function curatedReference(name: string) {
   const normalizedName = normalizeExerciseName(name);
   const alias = referenceAliases.find(({ pattern }) => pattern.test(normalizedName));
   return references[normalizedName] ?? (alias ? references[alias.key] : undefined);
+}
+
+export function resolveCuratedExerciseName(name: string) {
+  const normalizedName = normalizeExerciseName(name);
+  const alias = referenceAliases.find(({ pattern }) => pattern.test(normalizedName));
+  const key = (references[normalizedName] ? normalizedName : alias?.key) as keyof typeof references | undefined;
+  return key ? canonicalNames[key] : undefined;
+}
+
+export function getExerciseYouTubeSearchUrl(name: string) {
+  const exercise = resolveCuratedExerciseName(name) ?? name.replace(/\s+/g, " ").trim().slice(0, 100);
+  const recoveryQuery = /respiración|movilidad|control escapular|balanceo|deslizamiento|isométrica|transferencia|basculación|caminata/i.test(exercise);
+  const query = recoveryQuery
+    ? `${exercise} fisioterapia técnica correcta movimiento suave español`
+    : `${exercise} técnica correcta ejercicio tutorial español`;
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
 }
 
 function fallbackReference(name: string) {
