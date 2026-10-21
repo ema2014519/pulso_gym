@@ -6,6 +6,8 @@ node_modules/
 tsconfig.tsbuildinfo
 *.log
 logs/
+.playwright-profile/
+.playwright-artifacts/
 supabase/.temp/
 
 .vercel
