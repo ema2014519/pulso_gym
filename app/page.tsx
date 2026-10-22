@@ -8,6 +8,7 @@ import {
   Building2,
   CalendarDays,
   ChartLine,
+  ChevronDown,
   ChevronRight,
   CircleCheck,
   Clock3,
@@ -17,6 +18,7 @@ import {
   HeartPulse,
   LogOut,
   MapPinHouse,
+  MoreHorizontal,
   Plus,
   Salad,
   Sparkles,
@@ -28,7 +30,7 @@ import {
   CirclePlay as Youtube,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -37,7 +39,7 @@ import { getExerciseReference, getExerciseYouTubeSearchUrl } from "@/lib/exercis
 import { useExerciseReference, warmExerciseReferences } from "@/lib/use-exercise-reference";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { AmbientGymBackground } from "./ambient-gym-background";
-import { WorkoutReminders } from "./workout-reminders";
+import { PlanDetailsModal, type PlanPanel } from "./plan-details-modal";
 
 type TrainingPlace = "gimnasio" | "casa";
 type ProgressLog = { id: string; repetitions: number | null; doseCompleted: string | null; loadKg: number | null; effort: number | null; pain: number | null; createdAt: string; exerciseName: string };
@@ -183,6 +185,7 @@ export function AppWorkspace({ view }: { view: AppView }) {
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [referenceExercise, setReferenceExercise] = useState<string | null>(null);
   const [planPendingDeletion, setPlanPendingDeletion] = useState<WeeklyPlan | null>(null);
+  const [planPanel, setPlanPanel] = useState<PlanPanel | null>(null);
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
   const [progressLogs, setProgressLogs] = useState<ProgressLog[]>([]);
   const [isProgressLoading, setIsProgressLoading] = useState(true);
@@ -200,6 +203,14 @@ export function AppWorkspace({ view }: { view: AppView }) {
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const transition = { type: "spring" as const, stiffness: 280, damping: 24 };
+  const closePlanPanel = useCallback(() => setPlanPanel(null), []);
+  useEffect(() => {
+    if (view !== "Mi plan") return;
+    const requestedPanel = new URLSearchParams(window.location.search).get("panel");
+    if (requestedPanel === "recovery" || requestedPanel === "reminders" || requestedPanel === "methodology" || window.location.hash === "#recordatorios") {
+      void Promise.resolve().then(() => setPlanPanel(requestedPanel === "recovery" || requestedPanel === "methodology" ? requestedPanel : "reminders"));
+    }
+  }, [view]);
   useEffect(() => {
     if (!planPendingDeletion) return;
     deleteCancelRef.current?.focus();
@@ -232,6 +243,16 @@ export function AppWorkspace({ view }: { view: AppView }) {
     async function loadPlan() {
       setIsPlanLoading(true);
       setPlanLoadError("");
+      if (saved) {
+        try {
+          const cachedPlan = JSON.parse(saved) as WeeklyPlan;
+          setGeneratedPlan(cachedPlan);
+          setAvailablePlans((current) => current.length ? current : [cachedPlan]);
+          setIsPlanLoading(false);
+        } catch {
+          window.sessionStorage.removeItem("pulso-plan");
+        }
+      }
       let { data, error } = await supabase
         .from("weekly_plans")
         .select("id, name, created_at, goal, experience_level, rationale, safety_note, assessment_snapshot, nutrition_targets, methodology, planned_sessions(id, day_name, context, focus, duration_minutes, position, session_exercises(id, name, home_alternative, sets, repetitions, rest_seconds, position))")
@@ -583,13 +604,17 @@ export function AppWorkspace({ view }: { view: AppView }) {
   const maxPain = progressLogs.reduce((max, log) => Math.max(max, log.pain ?? 0), 0);
   const visiblePlanSessions = generatedPlan?.sessions.filter((plannedSession) => planFilter === "todos" || plannedSession.context === planFilter) ?? [];
   const totalPlanMinutes = generatedPlan?.sessions.reduce((total, plannedSession) => total + plannedSession.durationMinutes, 0) ?? 0;
-  const homeSessionCount = generatedPlan?.sessions.filter((plannedSession) => plannedSession.context === "casa").length ?? 0;
+  const nextPlanSession = activePlanSession || generatedPlan?.sessions[0];
+  const activePhaseName = generatedPlan?.assessment?.recovery
+    ? generatedPlan.assessment.recovery.phases?.[generatedPlan.assessment.recovery.activePhaseIndex ?? 0]?.name ?? generatedPlan.assessment.recovery.phase.replaceAll("_", " ")
+    : generatedPlan?.level.replace("Estoy ", "") ?? "Sin definir";
   const { reference: activeReference, isGenerating: isGeneratingReference } = useExerciseReference(referenceExercise ?? "", generatedPlan?.assessment?.biologicalSex);
 
   return (
     <main className="app-shell">
       <AmbientGymBackground />
       {planPendingDeletion && <div className="plan-delete-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !deletingPlanId) setPlanPendingDeletion(null); }}><section className="plan-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-delete-title" aria-describedby="plan-delete-description"><span className="plan-delete-icon" aria-hidden="true"><TriangleAlert size={25} /></span><div><p className="eyebrow">Acción permanente</p><h2 id="plan-delete-title">¿ELIMINAR “{planPendingDeletion.name.toUpperCase()}”?</h2><p id="plan-delete-description">También se eliminarán sus sesiones, ejercicios y registros de series. Esta acción no se puede deshacer.</p></div><div className="plan-delete-actions"><button ref={deleteCancelRef} className="button button-quiet" type="button" disabled={Boolean(deletingPlanId)} onClick={() => setPlanPendingDeletion(null)}>Conservar plan</button><button className="button button-danger" type="button" disabled={Boolean(deletingPlanId)} onClick={() => void deleteSelectedPlan()}>{deletingPlanId ? "Eliminando…" : "Eliminar definitivamente"}<Trash2 size={18} aria-hidden="true" /></button></div></section></div>}
+      {planPanel && generatedPlan && <PlanDetailsModal panel={planPanel} plan={generatedPlan} onClose={closePlanPanel} onReference={(exercise) => { setPlanPanel(null); setReferenceExercise(exercise); }} onRevise={() => { setPlanPanel(null); revisePlanWithAI(); }} />}
       {referenceExercise && activeReference && <div className="exercise-reference-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setReferenceExercise(null); }}><section className="exercise-reference-dialog" role="dialog" aria-modal="true" aria-labelledby="exercise-reference-title"><button className="exercise-reference-close" type="button" aria-label="Cerrar referencia" onClick={() => setReferenceExercise(null)}><X size={21} aria-hidden="true" /></button><div className="exercise-reference-image"><Image src={activeReference.image} alt={activeReference.alt} fill unoptimized={activeReference.generated} sizes="(max-width: 720px) 94vw, 760px" priority /></div><div className="exercise-reference-copy"><p className="eyebrow">{isGeneratingReference ? "Creando referencia exacta · mostrando guía provisional" : activeReference.generated ? "Guía visual generada y revisada · inicio y final" : "Guía visual · inicio y final"}</p><h2 id="exercise-reference-title">{referenceExercise.toUpperCase()}</h2><ul>{activeReference.cues.map((cue) => <li key={cue}><CircleCheck size={17} aria-hidden="true" /> {cue}</li>)}</ul><p className="exercise-reference-note">La imagen es una referencia general. Detén el ejercicio si aparece dolor agudo o inusual.</p><a className="exercise-youtube-link" href={getExerciseYouTubeSearchUrl(referenceExercise)} target="_blank" rel="noopener noreferrer" aria-label={`Buscar técnica de ${referenceExercise} en YouTube; abre una pestaña nueva`}><Youtube size={19} aria-hidden="true" /> Ver técnica en YouTube</a></div></section></div>}
       <aside className="sidebar" aria-label="Navegación principal">
         <Link className="brand" href="/" aria-label="Pulso, inicio">
@@ -624,7 +649,7 @@ export function AppWorkspace({ view }: { view: AppView }) {
             <p className="eyebrow">{todayPosition === null ? "Tu espacio de hoy" : `${calendarWeekdays[todayPosition].full} · Esta semana`}</p>
             <h1>{userName ? `Vamos, ${userName}.` : "Vamos por tu objetivo."}</h1>
           </div>
-          <button className="icon-button" type="button" aria-label="Configurar recordatorios" onClick={() => router.push("/plan#recordatorios")}>
+          <button className="icon-button" type="button" aria-label="Configurar recordatorios" onClick={() => activeNav === "Mi plan" ? setPlanPanel("reminders") : router.push("/plan?panel=reminders")}>
             <Bell size={20} aria-hidden="true" />
             <span className="notification-dot" aria-hidden="true" />
           </button>
@@ -636,19 +661,23 @@ export function AppWorkspace({ view }: { view: AppView }) {
           {activeNav === "Mi plan" && (
             <motion.section className="plan-view" aria-labelledby="plan-title" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={transition}>
               <div className="plan-view-heading">
-                <div><p className="eyebrow">Mis planes</p><h2 id="plan-title">TU RUTINA, TU LUGAR.</h2><p>Conserva varios planes y elige cuál quieres consultar o utilizar.</p></div>
-                <div className="plan-view-actions"><Link className="button button-primary" href="/evaluacion">Crear otro plan <Plus size={18} aria-hidden="true" /></Link>{generatedPlan && <button className="button button-quiet" type="button" onClick={revisePlanWithAI}>Mejorar con IA <Sparkles size={18} aria-hidden="true" /></button>}{generatedPlan && <button className="button button-danger" type="button" onClick={() => setPlanPendingDeletion(generatedPlan)}>Eliminar plan <Trash2 size={18} aria-hidden="true" /></button>}</div>
+                <div><p className="eyebrow">Mi plan</p><h2 id="plan-title">TU PLAN SEMANAL.</h2><p>Empieza tu próxima sesión o consulta los detalles cuando los necesites.</p></div>
+                {generatedPlan && <details className="plan-actions-menu"><summary aria-label="Más acciones del plan"><MoreHorizontal size={22} aria-hidden="true" /></summary><div><button type="button" onClick={revisePlanWithAI}><Sparkles size={17} aria-hidden="true" /> Mejorar con IA</button><button className="is-danger" type="button" onClick={() => setPlanPendingDeletion(generatedPlan)}><Trash2 size={17} aria-hidden="true" /> Eliminar plan</button></div></details>}
               </div>
               {generatedPlan && <>
-                <div className="plan-library" role="list" aria-label="Planes guardados">{availablePlans.map((savedPlan) => <button role="listitem" type="button" key={savedPlan.databaseId ?? savedPlan.createdAt} className={savedPlan.databaseId === generatedPlan.databaseId ? "is-active" : ""} onClick={() => { setGeneratedPlan(savedPlan); setExpandedSessionId(null); window.sessionStorage.setItem("pulso-plan", JSON.stringify(savedPlan)); }}><span>{savedPlan.name}</span><small>{savedPlan.goal} · {savedPlan.sessions.length} sesiones</small></button>)}</div>
+                <div className="plan-selector-row"><details className="plan-switcher"><summary><span><small>Plan seleccionado</small><strong>{generatedPlan.name}</strong><em>{generatedPlan.goal} · {generatedPlan.sessions.length} sesiones</em></span><ChevronDown size={19} aria-hidden="true" /></summary><div role="list" aria-label="Planes guardados">{availablePlans.map((savedPlan) => <button role="listitem" type="button" key={savedPlan.databaseId ?? savedPlan.createdAt} className={savedPlan.databaseId === generatedPlan.databaseId ? "is-active" : ""} onClick={(event) => { setGeneratedPlan(savedPlan); setExpandedSessionId(null); window.sessionStorage.setItem("pulso-plan", JSON.stringify(savedPlan)); event.currentTarget.closest("details")?.removeAttribute("open"); }}><span>{savedPlan.name}</span><small>{savedPlan.goal} · {savedPlan.sessions.length} sesiones</small></button>)}</div></details><Link className="plan-create-button" href="/evaluacion"><Plus size={18} aria-hidden="true" /><span>Crear plan</span></Link></div>
+                {nextPlanSession && <section className="plan-next-session" aria-labelledby="next-session-title"><div><p className="eyebrow">Próxima sesión · {nextPlanSession.day}</p><h3 id="next-session-title">{nextPlanSession.focus}</h3><p>{nextPlanSession.durationMinutes} min · {nextPlanSession.context === "casa" ? "En casa" : "Gimnasio"} · {nextPlanSession.exercises.length} ejercicios</p></div><Link className="button button-primary" href={`/entrenamiento?session=${encodeURIComponent(nextPlanSession.id)}&context=${nextPlanSession.context}`}>Iniciar rutina <ArrowRight size={18} aria-hidden="true" /></Link></section>}
                 <div className="plan-overview" aria-label="Resumen del plan">
                   <article><CalendarDays size={20} aria-hidden="true" /><span><strong>{generatedPlan.sessions.length}</strong><small>sesiones</small></span></article>
                   <article><Clock3 size={20} aria-hidden="true" /><span><strong>{totalPlanMinutes}</strong><small>minutos</small></span></article>
-                  <article><MapPinHouse size={20} aria-hidden="true" /><span><strong>{homeSessionCount}</strong><small>en casa</small></span></article>
-                  <article><Zap size={20} aria-hidden="true" /><span><strong>{generatedPlan.level.replace("Estoy ", "")}</strong><small>nivel actual</small></span></article>
+                  <article><Zap size={20} aria-hidden="true" /><span><strong>{activePhaseName}</strong><small>{generatedPlan.assessment?.recovery ? "fase actual" : "nivel actual"}</small></span></article>
                 </div>
-                <WorkoutReminders key={generatedPlan.databaseId ?? generatedPlan.createdAt ?? generatedPlan.name} planId={generatedPlan.databaseId} sessions={generatedPlan.sessions} recovery={generatedPlan.assessment?.recovery} />
-                <div className="plan-rationale"><span aria-hidden="true"><Zap size={18} /></span><div><strong>Por qué este plan</strong><p>{generatedPlan.rationale}</p></div></div>
+                <section className="plan-module-grid" aria-label="Información y herramientas del plan">
+                  {generatedPlan.assessment?.recovery && generatedPlan.assessment.planMode !== "fitness" && <button className="plan-module-card is-recovery" type="button" onClick={() => setPlanPanel("recovery")}><span><HeartPulse size={21} aria-hidden="true" /></span><div><small>Fase activa</small><strong>{generatedPlan.assessment.recovery.phases?.[generatedPlan.assessment.recovery.activePhaseIndex ?? 0]?.name ?? generatedPlan.assessment.recovery.phase.replaceAll("_", " ")}</strong><p>{generatedPlan.assessment.recovery.phases?.length ?? 0} fases · criterios y ejercicios</p></div><ChevronRight size={19} aria-hidden="true" /></button>}
+                  <button className="plan-module-card" type="button" onClick={() => setPlanPanel("reminders")}><span><Bell size={21} aria-hidden="true" /></span><div><small>Agenda</small><strong>Horarios y alertas</strong><p>Rutinas y ejercicios terapéuticos</p></div><ChevronRight size={19} aria-hidden="true" /></button>
+                  <button className="plan-module-card" type="button" onClick={() => setPlanPanel("methodology")}><span><BookOpen size={21} aria-hidden="true" /></span><div><small>Base del plan</small><strong>Método y seguridad</strong><p>Razones, progresión y fuentes</p></div><ChevronRight size={19} aria-hidden="true" /></button>
+                  {generatedPlan.nutrition && <Link className="plan-module-card is-nutrition" href="/nutricion"><span><Salad size={21} aria-hidden="true" /></span><div><small>Menú semanal</small><strong>Nutrición</strong><p>7 días · 3 comidas y alertas</p></div><ChevronRight size={19} aria-hidden="true" /></Link>}
+                </section>
                 {generatedPlan.assessment?.recovery && generatedPlan.assessment.planMode !== "fitness" && <section className="recovery-plan-summary" aria-labelledby="recovery-plan-title">
                   <header><span aria-hidden="true"><HeartPulse size={21} /></span><div><p className="eyebrow">{generatedPlan.assessment.planMode === "combined" ? "Entrenamiento adaptado" : "Plan de recuperación"}</p><h3 id="recovery-plan-title">RECUPERACIÓN CON CRITERIOS CLAROS.</h3></div><strong>{generatedPlan.assessment.recovery.phase.replaceAll("_", " ")}</strong></header>
                   <div className="recovery-plan-facts"><article><small>Meta funcional</small><p>{generatedPlan.assessment.recovery.primaryGoal}</p></article><article><small>Zonas consideradas</small><p>{generatedPlan.assessment.recovery.affectedAreas.join(", ")}</p></article><article><small>Diagnóstico profesional</small><p>{generatedPlan.assessment.recovery.professionalDiagnosis || "No declarado; el plan no presupone uno"}</p></article><article><small>Autorización clínica</small><p>{generatedPlan.assessment.recovery.clinicalClearance ? "Confirmada por el usuario" : "No confirmada"}</p></article></div>
@@ -683,13 +712,8 @@ export function AppWorkspace({ view }: { view: AppView }) {
                 const isExpanded = expandedSessionId === planSession.id;
                 return <article className={`plan-session-card ${isExpanded ? "is-expanded" : ""}`} key={planSession.id}>
                   <div className="plan-session-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</div>
-                  <div className="plan-session-top"><div><p className="eyebrow">{planSession.day} · {planSession.durationMinutes} min</p><h3>{planSession.focus}</h3><p className="plan-session-meta">{exercises.length} ejercicios · {exercises.reduce((total, exercise) => total + exercise.sets, 0)} series</p></div><span className={`context-pill ${isHome ? "is-home" : ""}`}>{isHome ? "En casa" : "Gimnasio"}</span></div>
-                  {isExpanded && <ul>{exercises.map((exercise, exerciseIndex) => <li key={`${exercise.name}-${exerciseIndex}`}><span><small>{String(exerciseIndex + 1).padStart(2, "0")}</small>{exercise.name}</span><span className="exercise-row-actions"><strong>{exercise.sets} × {exercise.repetitions} · {exercise.restSeconds}s descanso</strong>{getExerciseReference(exercise.name, generatedPlan.assessment?.biologicalSex) && <button type="button" aria-label={`Ver referencia de ${exercise.name}`} onClick={() => setReferenceExercise(exercise.name)}><BookOpen size={16} aria-hidden="true" /> Ver técnica</button>}</span></li>)}</ul>}
-                  <div className="plan-session-actions">
-                    <button className="plan-detail-button" type="button" aria-expanded={isExpanded} onClick={() => setExpandedSessionId(isExpanded ? null : planSession.id)}>{isExpanded ? "Ocultar ejercicios" : `Ver ejercicios (${exercises.length})`}</button>
-                    <Link className="button button-primary plan-start-button" href={`/entrenamiento?session=${encodeURIComponent(planSession.id)}&context=${isHome ? "casa" : "gimnasio"}`}>Iniciar rutina <ArrowRight size={17} aria-hidden="true" /></Link>
-                    <button className="text-button" type="button" disabled={updatingSessionId === planSession.id} onClick={() => void toggleSessionContext(planSession)}>{updatingSessionId === planSession.id ? "Actualizando…" : isHome ? "Cambiar a gimnasio" : "Entrenar en casa"} <ChevronRight size={16} aria-hidden="true" /></button>
-                  </div>
+                  <button className="plan-session-summary-button" type="button" aria-expanded={isExpanded} aria-controls={`session-details-${planSession.id}`} onClick={() => setExpandedSessionId(isExpanded ? null : planSession.id)}><span><span className="eyebrow">{planSession.day} · {planSession.durationMinutes} min</span><strong>{planSession.focus}</strong><small>{exercises.length} ejercicios · {exercises.reduce((total, exercise) => total + exercise.sets, 0)} series · {isHome ? "En casa" : "Gimnasio"}</small></span><span className={`context-pill ${isHome ? "is-home" : ""}`}>{isHome ? "Casa" : "Gym"}</span><ChevronDown size={20} aria-hidden="true" /></button>
+                  {isExpanded && <div className="plan-session-details" id={`session-details-${planSession.id}`}><ul>{exercises.map((exercise, exerciseIndex) => <li key={`${exercise.name}-${exerciseIndex}`}><span><small>{String(exerciseIndex + 1).padStart(2, "0")}</small>{exercise.name}</span><span className="exercise-row-actions"><strong>{exercise.sets} × {exercise.repetitions} · {exercise.restSeconds}s descanso</strong>{getExerciseReference(exercise.name, generatedPlan.assessment?.biologicalSex) && <button type="button" aria-label={`Ver referencia de ${exercise.name}`} onClick={() => setReferenceExercise(exercise.name)}><BookOpen size={16} aria-hidden="true" /> Ver técnica</button>}</span></li>)}</ul><div className="plan-session-actions"><Link className="button button-primary plan-start-button" href={`/entrenamiento?session=${encodeURIComponent(planSession.id)}&context=${isHome ? "casa" : "gimnasio"}`}>Iniciar rutina <ArrowRight size={17} aria-hidden="true" /></Link><button className="text-button" type="button" disabled={updatingSessionId === planSession.id} onClick={() => void toggleSessionContext(planSession)}>{updatingSessionId === planSession.id ? "Actualizando…" : isHome ? "Cambiar a gimnasio" : "Entrenar en casa"} <ChevronRight size={16} aria-hidden="true" /></button></div></div>}
                 </article>;
               })}{visiblePlanSessions.length === 0 && <div className="plan-empty"><h3>No hay sesiones con este filtro.</h3><p>Cambia el filtro o adapta una sesión a este lugar.</p></div>}</div> : <div className="plan-empty"><h3>Aún no hay un plan guardado.</h3><p>Completa tu evaluación para crear una rutina personalizada.</p></div>}
             </motion.section>

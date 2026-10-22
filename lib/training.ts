@@ -57,6 +57,22 @@ export type NutritionMealGuide = {
   options: string[];
 };
 
+export type NutritionScheduledMeal = {
+  name: string;
+  time: string;
+  objective: string;
+  foods: string[];
+  preparation: string;
+};
+
+export type NutritionDayPlan = {
+  weekday: number;
+  day: string;
+  phaseName: string;
+  focus: string;
+  meals: NutritionScheduledMeal[];
+};
+
 export type NutritionPhaseGuidance = {
   phaseName: string;
   focus: string;
@@ -73,6 +89,7 @@ export type NutritionProfile = {
   kitchenResources: string;
   strategy: string;
   mealStructure: NutritionMealGuide[];
+  weeklySchedule?: NutritionDayPlan[];
   recommendations: string[];
   phaseGuidance: NutritionPhaseGuidance[];
   professionalReferral: string;
@@ -115,6 +132,7 @@ export type NutritionTargets = {
   note: string;
   strategy?: string;
   mealStructure?: NutritionMealGuide[];
+  weeklySchedule?: NutritionDayPlan[];
   recommendations?: string[];
   phaseGuidance?: NutritionPhaseGuidance[];
   professionalReferral?: string;
@@ -438,6 +456,7 @@ function nutritionTargets(assessment: PlanAssessment, goal: FitnessGoal): Nutrit
     note: "Estimación educativa para un adulto sano. Ajusta según evolución de 2–4 semanas, hambre y rendimiento; condiciones clínicas requieren nutricionista o médico.",
     strategy: assessment.nutritionProfile?.strategy,
     mealStructure: assessment.nutritionProfile?.mealStructure,
+    weeklySchedule: assessment.nutritionProfile?.weeklySchedule,
     recommendations: assessment.nutritionProfile?.recommendations,
     phaseGuidance: assessment.nutritionProfile?.phaseGuidance,
     professionalReferral: assessment.nutritionProfile?.professionalReferral,

@@ -7,7 +7,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
-    "audit:plan": "node scripts/audit-plan.mjs"
+    "audit:plan": "node scripts/audit-plan.mjs",
+    "audit:nutrition": "node scripts/audit-nutrition.mjs"
   },
   "keywords": [],
   "author": "",

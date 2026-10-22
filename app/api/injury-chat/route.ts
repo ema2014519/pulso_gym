@@ -110,6 +110,37 @@ const summarySchema = {
             required: ["moment", "objective", "options"],
           },
         },
+        weeklySchedule: {
+          type: "array",
+          minItems: 7,
+          maxItems: 7,
+          items: {
+            type: "object",
+            properties: {
+              weekday: { type: "integer", minimum: 0, maximum: 6 },
+              day: { type: "string" },
+              phaseName: { type: "string" },
+              focus: { type: "string" },
+              meals: {
+                type: "array",
+                minItems: 3,
+                maxItems: 3,
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    time: { type: "string" },
+                    objective: { type: "string" },
+                    foods: { type: "array", items: { type: "string" } },
+                    preparation: { type: "string" },
+                  },
+                  required: ["name", "time", "objective", "foods", "preparation"],
+                },
+              },
+            },
+            required: ["weekday", "day", "phaseName", "focus", "meals"],
+          },
+        },
         recommendations: { type: "array", items: { type: "string" } },
         phaseGuidance: {
           type: "array",
@@ -125,7 +156,7 @@ const summarySchema = {
         },
         professionalReferral: { type: "string" },
       },
-      required: ["status", "objective", "currentPattern", "scheduleAndAccess", "accessibleFoods", "unavailableFoods", "kitchenResources", "strategy", "mealStructure", "recommendations", "phaseGuidance", "professionalReferral"],
+      required: ["status", "objective", "currentPattern", "scheduleAndAccess", "accessibleFoods", "unavailableFoods", "kitchenResources", "strategy", "mealStructure", "weeklySchedule", "recommendations", "phaseGuidance", "professionalReferral"],
     },
   },
   required: ["planName", "planMode", "goal", "level", "daysPerWeek", "sessionMinutes", "age", "biologicalSex", "heightCm", "weightKg", "activityLevel", "sleepHours", "stressLevel", "equipment", "painPoints", "injuries", "medicalConditions", "medications", "allergies", "dietaryPreference", "hasRedFlags", "safetyReviewed", "recovery", "nutritionProfile"],
@@ -272,7 +303,9 @@ Todo ejercicio incluido en recovery.exercises, recovery.phases[].exercises o pla
 
 Un plan de recuperación es orientación física progresiva, no “tratamiento médico”. No prometas plazos de curación ni reducción de tinnitus u otros síntomas. No recomiendes calor, frío, masaje o estiramiento como regla universal: considera si el problema es agudo o persistente y formula la recomendación como opción prudente con límite temporal. No inmovilices por completo a una persona sin necesidad: identifica actividad tolerada y alternativas seguras, salvo que haya señales de alarma o una indicación profesional de reposo.
 
-Analiza también la alimentación como parte del proyecto. Pregunta progresivamente por patrón actual de comidas, horarios, hambre o apetito, alimentos habituales, preferencias, alergias/intolerancias, presupuesto, posibilidad de cocinar y, de forma explícita, qué alimentos puede conseguir normalmente. Conserva esa lista en accessibleFoods, lo que no consigue o no consume en unavailableFoods y los electrodomésticos o recursos reales en kitchenResources. No supongas acceso a productos caros, suplementos, alimentos importados o ingredientes no mencionados. Relaciona la estrategia con goal, actividad, sueño, estrés y, si existe, las fases de recuperación. Completa nutritionProfile con: objetivo nutricional, patrón actual resumido, restricciones de horario/acceso, estrategia, estructura práctica de comidas con varias opciones intercambiables, recomendaciones y ajustes para cada fase de recuperación. Cada opción de mealStructure debe construirse únicamente con alimentos presentes en accessibleFoods y respetar unavailableFoods, alergias, preferencias y kitchenResources. Si falta un grupo alimentario útil, señálalo como una compra opcional accesible, no lo incluyas como si ya estuviera disponible. No presentes un menú rígido como única alternativa y no atribuyas a un alimento la capacidad de curar una lesión.
+Analiza también la alimentación como parte del proyecto. Pregunta progresivamente por patrón actual de comidas, horarios, hambre o apetito, alimentos habituales, preferencias, alergias/intolerancias, presupuesto, posibilidad de cocinar y, de forma explícita, qué alimentos puede conseguir normalmente. Conserva esa lista en accessibleFoods, lo que no consigue o no consume en unavailableFoods y los electrodomésticos o recursos reales en kitchenResources. No supongas acceso a productos caros, suplementos, alimentos importados o ingredientes no mencionados. Relaciona la estrategia con goal, actividad, sueño, estrés y, si existe, la fase de recuperación activa. Completa nutritionProfile con: objetivo nutricional, patrón actual resumido, restricciones de horario/acceso, estrategia, estructura práctica de comidas con opciones intercambiables, calendario semanal, recomendaciones y ajustes para cada fase de recuperación.
+
+weeklySchedule debe contener exactamente los siete días de la semana, una sola vez cada uno, usando weekday 0 para domingo hasta 6 para sábado. Cada día debe tener exactamente tres comidas concretas y realizables, normalmente desayuno, almuerzo y cena, con un horario local HH:MM, objetivo, lista de alimentos y preparación breve. Ajusta el foco y las comidas al objetivo y a la fase activa: distingue de forma prudente entre un día de entrenamiento, recuperación o descanso cuando el plan lo permita. No inventes cantidades clínicas ni prometas que una comida trata una lesión. Las comidas y cada opción de mealStructure deben construirse únicamente con alimentos presentes en accessibleFoods y respetar unavailableFoods, alergias, preferencias y kitchenResources. Si falta un grupo alimentario útil, señálalo como una compra opcional accesible, no lo incluyas como si ya estuviera disponible. Ofrece variedad durante la semana sin convertir el menú en una regla inflexible.
 
 nutritionProfile.status es general_guidance para orientación de un adulto sin necesidades clínicas especiales. Usa professional_review y explica el motivo en professionalReferral si hay enfermedad renal, hepática o metabólica relevante, embarazo/lactancia, alergias graves, interacción potencial con medicación, trastorno de la conducta alimentaria o una dieta terapéutica indicada. En esos casos no calcules ni recomiendes una restricción agresiva y limita mealStructure a ejemplos generales compatibles con las restricciones declaradas. Nunca recomiendes iniciar, suspender o modificar suplementos o medicamentos. Mantén principios de suficiencia, equilibrio, moderación y diversidad; adapta los alimentos al contexto cultural y económico descrito.
 

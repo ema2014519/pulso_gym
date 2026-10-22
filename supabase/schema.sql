@@ -122,6 +122,25 @@ create table public.treatment_reminders (
   check (cardinality(weekdays) > 0 and weekdays <@ array[0,1,2,3,4,5,6]::smallint[])
 );
 
+create table public.nutrition_reminders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  plan_id uuid not null references public.weekly_plans(id) on delete cascade,
+  weekday smallint not null check (weekday between 0 and 6),
+  meal_index smallint not null check (meal_index between 0 and 2),
+  meal_name text not null,
+  meal_summary text not null default '',
+  time_local time not null,
+  timezone text not null,
+  enabled boolean not null default true,
+  last_sent_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, plan_id, weekday, meal_index)
+);
+
+create index nutrition_reminders_due_idx on public.nutrition_reminders (enabled, plan_id, weekday);
+
 create table public.exercise_media (
   id uuid primary key default gen_random_uuid(),
   normalized_name text not null,
@@ -151,6 +170,7 @@ alter table public.exercise_logs enable row level security;
 alter table public.push_subscriptions enable row level security;
 alter table public.workout_reminders enable row level security;
 alter table public.treatment_reminders enable row level security;
+alter table public.nutrition_reminders enable row level security;
 alter table public.exercise_media enable row level security;
 
 create policy "profiles are private" on public.profiles for all using (auth.uid() = id) with check (auth.uid() = id);
@@ -161,11 +181,13 @@ create policy "logs belong to user plan" on public.exercise_logs for all using (
 create policy "push subscriptions are private" on public.push_subscriptions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "workout reminders are private" on public.workout_reminders for all using (auth.uid() = user_id and exists (select 1 from public.planned_sessions s join public.weekly_plans p on p.id = s.plan_id where s.id = session_id and s.plan_id = plan_id and p.user_id = auth.uid())) with check (auth.uid() = user_id and exists (select 1 from public.planned_sessions s join public.weekly_plans p on p.id = s.plan_id where s.id = session_id and s.plan_id = plan_id and p.user_id = auth.uid()));
 create policy "treatment reminders are private" on public.treatment_reminders for all using (auth.uid() = user_id and exists (select 1 from public.weekly_plans p where p.id = plan_id and p.user_id = auth.uid())) with check (auth.uid() = user_id and exists (select 1 from public.weekly_plans p where p.id = plan_id and p.user_id = auth.uid()));
+create policy "nutrition reminders are private" on public.nutrition_reminders for all using (auth.uid() = user_id and exists (select 1 from public.weekly_plans p where p.id = plan_id and p.user_id = auth.uid())) with check (auth.uid() = user_id and exists (select 1 from public.weekly_plans p where p.id = plan_id and p.user_id = auth.uid()));
 create policy "ready exercise media is readable" on public.exercise_media for select using (status = 'ready');
 
 grant select, insert, update, delete on public.push_subscriptions to authenticated;
 grant select, insert, update, delete on public.workout_reminders to authenticated;
 grant select, insert, update, delete on public.treatment_reminders to authenticated;
+grant select, insert, update, delete on public.nutrition_reminders to authenticated;
 grant select on public.exercise_media to anon, authenticated;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

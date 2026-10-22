@@ -27,6 +27,16 @@ type TreatmentReminderRow = {
   timezone: string;
   last_sent_at: string | null;
 };
+type NutritionReminderRow = {
+  id: string;
+  user_id: string;
+  weekday: number;
+  meal_name: string;
+  meal_summary: string;
+  time_local: string;
+  timezone: string;
+  last_sent_at: string | null;
+};
 
 const weekdayIndexes: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
@@ -75,6 +85,15 @@ function isTreatmentDue(reminder: TreatmentReminderRow, now: Date) {
   return !sentRecently && reminder.weekdays.includes(clock.weekday) && clock.minute >= deliveryMinute && clock.minute < deliveryMinute + 10;
 }
 
+function isNutritionDue(reminder: NutritionReminderRow, now: Date) {
+  let clock: ReturnType<typeof localClock>;
+  try { clock = localClock(now, reminder.timezone); } catch { return false; }
+  const [hour, minute] = reminder.time_local.split(":").map(Number);
+  const deliveryMinute = hour * 60 + minute;
+  const sentRecently = reminder.last_sent_at && now.getTime() - new Date(reminder.last_sent_at).getTime() < 20 * 60 * 60 * 1000;
+  return !sentRecently && clock.weekday === reminder.weekday && clock.minute >= deliveryMinute && clock.minute < deliveryMinute + 10;
+}
+
 async function dispatch(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
@@ -90,18 +109,20 @@ async function dispatch(request: Request) {
 
   webpush.setVapidDetails(subject, publicKey, privateKey);
   const supabase = createSupabaseAdminClient();
-  const [{ data, error }, { data: treatmentData, error: treatmentError }] = await Promise.all([
+  const [{ data, error }, { data: treatmentData, error: treatmentError }, { data: nutritionData, error: nutritionError }] = await Promise.all([
     supabase.from("workout_reminders").select("id,user_id,session_id,weekday,time_local,timezone,minutes_before,last_sent_at").eq("enabled", true),
     supabase.from("treatment_reminders").select("id,user_id,exercise_name,dose,weekdays,time_local,timezone,last_sent_at").eq("enabled", true),
+    supabase.from("nutrition_reminders").select("id,user_id,weekday,meal_name,meal_summary,time_local,timezone,last_sent_at").eq("enabled", true),
   ]);
-  if (error || treatmentError) return Response.json({ error: error?.message ?? treatmentError?.message }, { status: 500 });
+  if (error || treatmentError || (nutritionError && nutritionError.code !== "42P01")) return Response.json({ error: error?.message ?? treatmentError?.message ?? nutritionError?.message }, { status: 500 });
 
   const now = new Date();
   const due = (data as ReminderRow[]).filter((reminder) => isDue(reminder, now));
   const treatmentDue = (treatmentData as TreatmentReminderRow[]).filter((reminder) => isTreatmentDue(reminder, now));
-  if (!due.length && !treatmentDue.length) return Response.json({ ok: true, due: 0, sent: 0 });
+  const nutritionDue = (nutritionData as NutritionReminderRow[]).filter((reminder) => isNutritionDue(reminder, now));
+  if (!due.length && !treatmentDue.length && !nutritionDue.length) return Response.json({ ok: true, due: 0, sent: 0 });
 
-  const userIds = [...new Set([...due.map((reminder) => reminder.user_id), ...treatmentDue.map((reminder) => reminder.user_id)])];
+  const userIds = [...new Set([...due.map((reminder) => reminder.user_id), ...treatmentDue.map((reminder) => reminder.user_id), ...nutritionDue.map((reminder) => reminder.user_id)])];
   const sessionIds = [...new Set(due.map((reminder) => reminder.session_id))];
   const { data: subscriptions } = await supabase.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", userIds);
   const { data: sessions } = sessionIds.length
@@ -150,7 +171,17 @@ async function dispatch(request: Request) {
     if (delivered) await supabase.from("treatment_reminders").update({ last_sent_at: now.toISOString(), updated_at: now.toISOString() }).eq("id", reminder.id);
   }
 
-  return Response.json({ ok: true, due: due.length + treatmentDue.length, workoutDue: due.length, treatmentDue: treatmentDue.length, sent });
+  for (const reminder of nutritionDue) {
+    const delivered = await sendToUser(reminder.user_id, {
+      title: `Hora de ${reminder.meal_name}`,
+      body: reminder.meal_summary || "Revisa la comida programada para hoy.",
+      url: `/nutricion?day=${reminder.weekday}`,
+      tag: `nutrition-${reminder.id}`,
+    });
+    if (delivered) await supabase.from("nutrition_reminders").update({ last_sent_at: now.toISOString(), updated_at: now.toISOString() }).eq("id", reminder.id);
+  }
+
+  return Response.json({ ok: true, due: due.length + treatmentDue.length + nutritionDue.length, workoutDue: due.length, treatmentDue: treatmentDue.length, nutritionDue: nutritionDue.length, sent });
 }
 
 export const GET = dispatch;
