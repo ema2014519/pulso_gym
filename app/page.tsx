@@ -43,6 +43,10 @@ import { PlanDetailsModal, type PlanPanel } from "./plan-details-modal";
 
 type TrainingPlace = "gimnasio" | "casa";
 type ProgressLog = { id: string; repetitions: number | null; doseCompleted: string | null; loadKg: number | null; effort: number | null; pain: number | null; createdAt: string; exerciseName: string };
+
+function getPlanKey(plan: WeeklyPlan) {
+  return plan.databaseId ?? plan.createdAt ?? plan.name;
+}
 type ProfileForm = { displayName: string; goal: string; experienceLevel: string; daysPerWeek: string; homeEquipment: string[] };
 
 const navItems = [
@@ -550,7 +554,7 @@ export function AppWorkspace({ view }: { view: AppView }) {
   async function deleteSelectedPlan() {
     const plan = planPendingDeletion;
     if (!plan || deletingPlanId) return;
-    const planKey = plan.databaseId ?? plan.createdAt ?? plan.name;
+    const planKey = getPlanKey(plan);
     setDeletingPlanId(planKey);
     setPlanMessage("");
 
@@ -563,8 +567,8 @@ export function AppWorkspace({ view }: { view: AppView }) {
       }
     }
 
-    const remainingPlans = availablePlans.filter((item) => (item.databaseId ?? item.createdAt ?? item.name) !== planKey);
-    const deletingActivePlan = (generatedPlan?.databaseId ?? generatedPlan?.createdAt ?? generatedPlan?.name) === planKey;
+    const remainingPlans = availablePlans.filter((item) => getPlanKey(item) !== planKey);
+    const deletingActivePlan = generatedPlan ? getPlanKey(generatedPlan) === planKey : false;
     setAvailablePlans(remainingPlans);
     setPlanPendingDeletion(null);
     setDeletingPlanId(null);
@@ -602,6 +606,12 @@ export function AppWorkspace({ view }: { view: AppView }) {
   const effortLogs = progressLogs.filter((log) => log.effort !== null);
   const averageEffort = effortLogs.length ? effortLogs.reduce((total, log) => total + (log.effort ?? 0), 0) / effortLogs.length : 0;
   const maxPain = progressLogs.reduce((max, log) => Math.max(max, log.pain ?? 0), 0);
+  const lastActivity = progressLogs[0]?.createdAt ? new Intl.DateTimeFormat("es", { day: "numeric", month: "short" }).format(new Date(progressLogs[0].createdAt)) : "Sin registros";
+  const progressInsight = maxPain >= 5
+    ? { tone: "warning", title: "Revisa dolor y carga", copy: "Registraste dolor elevado. Reduce intensidad y evita progresar hasta volver a una respuesta tolerable." }
+    : averageEffort >= 8
+      ? { tone: "effort", title: "Intensidad alta", copy: "Tu esfuerzo reciente es exigente. Prioriza descanso y técnica antes de aumentar carga o volumen." }
+      : { tone: "steady", title: "Ritmo controlado", copy: "La intensidad y la respuesta de dolor se mantienen en un rango prudente para continuar." };
   const visiblePlanSessions = generatedPlan?.sessions.filter((plannedSession) => planFilter === "todos" || plannedSession.context === planFilter) ?? [];
   const totalPlanMinutes = generatedPlan?.sessions.reduce((total, plannedSession) => total + plannedSession.durationMinutes, 0) ?? 0;
   const nextPlanSession = activePlanSession || generatedPlan?.sessions[0];
@@ -665,7 +675,27 @@ export function AppWorkspace({ view }: { view: AppView }) {
                 {generatedPlan && <details className="plan-actions-menu"><summary aria-label="Más acciones del plan"><MoreHorizontal size={22} aria-hidden="true" /></summary><div><button type="button" onClick={revisePlanWithAI}><Sparkles size={17} aria-hidden="true" /> Mejorar con IA</button><button className="is-danger" type="button" onClick={() => setPlanPendingDeletion(generatedPlan)}><Trash2 size={17} aria-hidden="true" /> Eliminar plan</button></div></details>}
               </div>
               {generatedPlan && <>
-                <div className="plan-selector-row"><details className="plan-switcher"><summary><span><small>Plan seleccionado</small><strong>{generatedPlan.name}</strong><em>{generatedPlan.goal} · {generatedPlan.sessions.length} sesiones</em></span><ChevronDown size={19} aria-hidden="true" /></summary><div role="list" aria-label="Planes guardados">{availablePlans.map((savedPlan) => <button role="listitem" type="button" key={savedPlan.databaseId ?? savedPlan.createdAt} className={savedPlan.databaseId === generatedPlan.databaseId ? "is-active" : ""} onClick={(event) => { setGeneratedPlan(savedPlan); setExpandedSessionId(null); window.sessionStorage.setItem("pulso-plan", JSON.stringify(savedPlan)); event.currentTarget.closest("details")?.removeAttribute("open"); }}><span>{savedPlan.name}</span><small>{savedPlan.goal} · {savedPlan.sessions.length} sesiones</small></button>)}</div></details><Link className="plan-create-button" href="/evaluacion"><Plus size={18} aria-hidden="true" /><span>Crear plan</span></Link></div>
+                <div className="plan-selector-row">
+                  <details className="plan-switcher">
+                    <summary><span><small>Plan seleccionado</small><strong>{generatedPlan.name}</strong><em>{generatedPlan.goal} · {generatedPlan.sessions.length} sesiones</em></span><ChevronDown size={19} aria-hidden="true" /></summary>
+                    <div role="list" aria-label="Planes guardados">
+                      {availablePlans.map((savedPlan) => {
+                        const savedPlanKey = getPlanKey(savedPlan);
+                        const isActivePlan = savedPlanKey === getPlanKey(generatedPlan);
+                        return <article role="listitem" className={`plan-switcher-item ${isActivePlan ? "is-active" : ""}`} key={savedPlanKey}>
+                          <button className="plan-switcher-select" type="button" aria-current={isActivePlan ? "true" : undefined} onClick={(event) => { setGeneratedPlan(savedPlan); setExpandedSessionId(null); window.sessionStorage.setItem("pulso-plan", JSON.stringify(savedPlan)); event.currentTarget.closest("details")?.removeAttribute("open"); }}>
+                            <span>{savedPlan.name}</span>
+                            <small>{savedPlan.goal} · {savedPlan.sessions.length} sesiones{isActivePlan ? " · Actual" : ""}</small>
+                          </button>
+                          <button className="plan-switcher-delete" type="button" aria-label={`Eliminar el plan ${savedPlan.name}`} title="Eliminar plan" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); setPlanPendingDeletion(savedPlan); }}>
+                            <Trash2 size={17} aria-hidden="true" />
+                          </button>
+                        </article>;
+                      })}
+                    </div>
+                  </details>
+                  <Link className="plan-create-button" href="/evaluacion"><Plus size={18} aria-hidden="true" /><span>Crear plan</span></Link>
+                </div>
                 {nextPlanSession && <section className="plan-next-session" aria-labelledby="next-session-title"><div><p className="eyebrow">Próxima sesión · {nextPlanSession.day}</p><h3 id="next-session-title">{nextPlanSession.focus}</h3><p>{nextPlanSession.durationMinutes} min · {nextPlanSession.context === "casa" ? "En casa" : "Gimnasio"} · {nextPlanSession.exercises.length} ejercicios</p></div><Link className="button button-primary" href={`/entrenamiento?session=${encodeURIComponent(nextPlanSession.id)}&context=${nextPlanSession.context}`}>Iniciar rutina <ArrowRight size={18} aria-hidden="true" /></Link></section>}
                 <div className="plan-overview" aria-label="Resumen del plan">
                   <article><CalendarDays size={20} aria-hidden="true" /><span><strong>{generatedPlan.sessions.length}</strong><small>sesiones</small></span></article>
@@ -723,17 +753,18 @@ export function AppWorkspace({ view }: { view: AppView }) {
         <AnimatePresence>
           {activeNav === "Progreso" && (
             <motion.section className="progress-view" aria-labelledby="progress-title" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={transition}>
-              <div className="plan-view-heading"><div><p className="eyebrow">Progreso</p><h2 id="progress-title">EL TRABAJO DEJA HUELLA.</h2><p>{generatedPlan?.assessment?.recovery ? "Revisa dosis completadas, esfuerzo y respuesta de dolor durante tu recuperación." : "Resumen de tus últimas series registradas."}</p></div><button className="button button-quiet" type="button" onClick={() => router.push("/")}>Volver al inicio</button></div>
-              {isProgressLoading ? <p className="progress-state">Cargando tus registros…</p> : progressLoadError ? <div className="plan-empty"><h3>No se pudo cargar el progreso.</h3><p>{progressLoadError}</p><button className="text-button" type="button" onClick={() => setProgressReloadKey((current) => current + 1)}>Reintentar <ChevronRight size={16} aria-hidden="true" /></button></div> : progressLogs.length === 0 ? <div className="plan-empty"><h3>Aún no registraste series.</h3><p>Inicia una sesión y guarda cada serie para ver tu evolución aquí.</p></div> : <>
+              <div className="plan-view-heading progress-heading"><div><p className="eyebrow">Progreso</p><h2 id="progress-title">TU EVOLUCIÓN, CLARA.</h2><p>{generatedPlan?.assessment?.recovery ? "Controla dosis, esfuerzo y respuesta de dolor durante tu recuperación." : "Revisa tu carga, intensidad y constancia sin perderte entre registros."}</p></div><button className="button button-quiet" type="button" onClick={() => router.push("/")}>Registrar actividad <ArrowRight size={17} aria-hidden="true" /></button></div>
+              {isProgressLoading ? <p className="progress-state">Cargando tus registros…</p> : progressLoadError ? <div className="plan-empty"><h3>No se pudo cargar el progreso.</h3><p>{progressLoadError}</p><button className="text-button" type="button" onClick={() => setProgressReloadKey((current) => current + 1)}>Reintentar <ChevronRight size={16} aria-hidden="true" /></button></div> : progressLogs.length === 0 ? <div className="plan-empty progress-empty"><span aria-hidden="true"><ChartLine size={25} /></span><div><h3>Tu progreso empieza con la primera serie.</h3><p>Inicia una rutina y registra cada serie para construir aquí tu historial.</p></div><button className="button button-primary" type="button" onClick={() => router.push("/")}>Ir a entrenar <ArrowRight size={17} aria-hidden="true" /></button></div> : <>
+                <section className={`progress-insight is-${progressInsight.tone}`} aria-label="Estado reciente"><span aria-hidden="true">{progressInsight.tone === "warning" ? <TriangleAlert size={21} /> : progressInsight.tone === "effort" ? <Flame size={21} /> : <CircleCheck size={21} />}</span><div><small>Lectura reciente</small><strong>{progressInsight.title}</strong><p>{progressInsight.copy}</p></div><em>Última actividad · {lastActivity}</em></section>
                 <div className="progress-summary">
-                  <article><p>Series registradas</p><strong>{progressLogs.length}</strong></article>
-                  <article><p>{generatedPlan?.assessment?.recovery ? "Dosis completadas" : "Volumen total"}</p><strong>{generatedPlan?.assessment?.recovery ? recoveryDoseCount : Math.round(totalVolume)} {!generatedPlan?.assessment?.recovery && <small>kg</small>}</strong></article>
-                  <article><p>Esfuerzo medio</p><strong>{averageEffort.toFixed(1)}<small>/10</small></strong></article>
-                  <article><p>Dolor máximo</p><strong>{maxPain}<small>/10</small></strong></article>
+                  <article><span aria-hidden="true"><Trophy size={18} /></span><div><p>Series</p><strong>{progressLogs.length}</strong></div></article>
+                  <article><span aria-hidden="true">{generatedPlan?.assessment?.recovery ? <HeartPulse size={18} /> : <Dumbbell size={18} />}</span><div><p>{generatedPlan?.assessment?.recovery ? "Dosis" : "Volumen"}</p><strong>{generatedPlan?.assessment?.recovery ? recoveryDoseCount : Math.round(totalVolume)} {!generatedPlan?.assessment?.recovery && <small>kg</small>}</strong></div></article>
+                  <article><span aria-hidden="true"><Flame size={18} /></span><div><p>Esfuerzo</p><strong>{averageEffort.toFixed(1)}<small>/10</small></strong></div></article>
+                  <article className={maxPain > 3 ? "has-warning" : ""}><span aria-hidden="true"><HeartPulse size={18} /></span><div><p>Dolor máx.</p><strong>{maxPain}<small>/10</small></strong></div></article>
                 </div>
                 <div className="progress-grid">
-                  <article className="progress-card effort-card"><p className="eyebrow">Esfuerzo reciente</p><h3>INTENSIDAD</h3><div className="effort-bars" aria-label="Gráfico de esfuerzo de las últimas series">{progressLogs.slice(0, 8).reverse().map((log) => <span key={log.id} style={{ height: `${Math.max(12, (log.effort ?? 0) * 10)}%` }} title={`${log.exerciseName}: esfuerzo ${log.effort ?? 0} de 10`} />)}</div><p>Escala percibida de esfuerzo de 1 a 10.</p></article>
-                  <article className="progress-card"><p className="eyebrow">Últimas series</p><h3>HISTORIAL</h3><div className="progress-log-list">{progressLogs.slice(0, 5).map((log) => <div key={log.id}><span><strong>{log.exerciseName}</strong><small>{new Intl.DateTimeFormat("es", { day: "numeric", month: "short" }).format(new Date(log.createdAt))}</small></span><span>{log.doseCompleted || `${log.repetitions ?? "—"} reps`}{log.loadKg !== null ? ` · ${log.loadKg} kg` : ""}</span><span className={log.pain && log.pain > 3 ? "pain-warning" : ""}>dolor {log.pain ?? 0}/10</span></div>)}</div></article>
+                  <article className="progress-card effort-card"><header><span aria-hidden="true"><ChartLine size={19} /></span><div><p className="eyebrow">Últimas {Math.min(progressLogs.length, 8)} series</p><h3>ESFUERZO</h3></div></header><div className="effort-bars" aria-label="Gráfico de esfuerzo de las últimas series">{progressLogs.slice(0, 8).reverse().map((log) => <span key={log.id} style={{ height: `${Math.max(12, (log.effort ?? 0) * 10)}%` }} title={`${log.exerciseName}: esfuerzo ${log.effort ?? 0} de 10`} />)}</div><p>Escala percibida de esfuerzo de 1 a 10.</p></article>
+                  <article className="progress-card progress-history"><header><span aria-hidden="true"><Clock3 size={19} /></span><div><p className="eyebrow">Actividad reciente</p><h3>HISTORIAL</h3></div></header><div className="progress-log-list">{progressLogs.slice(0, 6).map((log) => <div key={log.id}><span className="progress-log-main"><strong>{log.exerciseName}</strong><small>{new Intl.DateTimeFormat("es", { day: "numeric", month: "short" }).format(new Date(log.createdAt))}</small></span><span className="progress-log-dose">{log.doseCompleted || `${log.repetitions ?? "—"} reps`}{log.loadKg !== null ? ` · ${log.loadKg} kg` : ""}</span><span className={`progress-log-pain ${log.pain && log.pain > 3 ? "pain-warning" : ""}`}>Dolor {log.pain ?? 0}/10</span></div>)}</div></article>
                 </div>
               </>}
             </motion.section>
